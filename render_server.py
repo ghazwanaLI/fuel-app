@@ -137,6 +137,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = urlparse(self.path).path.rstrip("/")
+        
+        # PWA files
+        static_files = {
+            '/manifest.json': ('manifest.json', 'application/json'),
+            '/sw.js': ('sw.js', 'application/javascript'),
+            '/icon-192.png': ('icon-192.png', 'image/png'),
+            '/icon-512.png': ('icon-512.png', 'image/png'),
+        }
+        if p in static_files:
+            fname, mime = static_files[p]
+            fpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)
+            if os.path.exists(fpath):
+                with open(fpath, 'rb') as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', mime)
+                self.send_header('Content-Length', len(body))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_json({'error': 'not found'}, 404)
+            return
+
         if p in ("", "/"):
             html_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
             with open(html_file, "r", encoding="utf-8") as f:
@@ -201,11 +224,16 @@ class Handler(BaseHTTPRequestHandler):
             if not body.get("name"): self.send_json({"error": "اسم المحطة مطلوب"}, 400); return
             db = load_db()
             sid = db["next_station_id"]; db["next_station_id"] += 1
+            from datetime import datetime
+            now = datetime.now().strftime("%Y-%m-%d %H:%M")
             station = {
                 "id": sid, "name": body["name"], "phone": body.get("phone", ""),
                 "tax":       body.get("tax",       empty_doc()),
                 "guarantee": body.get("guarantee", empty_doc()),
                 "social":    body.get("social",    empty_doc()),
+                "created_by": u["fullname"],
+                "updated_by": u["fullname"],
+                "updated_at": now,
             }
             db["stations"].append(station); save_db(db)
             self.send_json({"ok": True, "station": station})
@@ -285,6 +313,9 @@ class Handler(BaseHTTPRequestHandler):
             if "phone" in body: s["phone"] = body["phone"]
             for doc in ["tax", "guarantee", "social"]:
                 if doc in body: s[doc] = body[doc]
+            from datetime import datetime
+            s["updated_by"] = u["fullname"]
+            s["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
             save_db(db); self.send_json({"ok": True, "station": s})
 
         elif p.startswith("/api/users/"):
