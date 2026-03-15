@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>تدقيق اوليات المحطات الاهلية</title>
-<!-- PWA -->
-<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1a4f1a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -778,7 +776,7 @@ function docStatus(doc){
 
 // ── TABLE HEADERS ──
 function buildHeaders(){
-  const h=`<th>#</th><th>اسم المحطة</th><th>🧾 التحاسب الضريبي</th><th>ينتهي</th><th>📄 خطاب الضمان</th><th>ينتهي</th><th>🛡️ الضمان الاجتماعي</th><th>ينتهي</th>`
+  const h=`<th>#</th><th>اسم المحطة</th><th>🧾 التحاسب الضريبي</th><th>ينتهي</th><th>📄 خطاب الضمان</th><th>ينتهي</th><th>🛡️ الضمان الاجتماعي</th><th>ينتهي</th><th>✏️ آخر تعديل</th>`
     +(can('docs')?'<th>الوثائق</th>':'')
 
     +((can('edit')||can('del'))?'<th>إجراءات</th>':'');
@@ -796,6 +794,9 @@ function sRow(s,n){
     <td>${s.guarantee&&s.guarantee.active?`<small>${fd(s.guarantee.expiry)}</small>`:'—'}</td>
     <td>${s.social&&s.social.active?'<span class="badge by">✓ نعم</span>':'<span class="badge bn">✗ لا</span>'}</td>
     <td>${s.social&&s.social.active?`<small>${fd(s.social.expiry)}</small>`:'—'}</td>
+    <td style="font-size:11px;color:var(--t2)">
+      ${s.updated_by?`<div style="font-weight:600">${s.updated_by}</div><div style="color:var(--t3);font-size:10px">${s.updated_at||''}</div>`:'—'}
+    </td>
     ${can('docs')?`<td><button class="btn btn-outline btn-sm" onclick="openDocs(${s.id})">📂 عرض</button></td>`:''}
     <td>
     ${(can('edit')||can('del'))?`<td><div style="display:flex;gap:5px">
@@ -906,7 +907,7 @@ async function saveStation(){
   const name=document.getElementById('fn').value.trim();
   if(!name){toast('الرجاء إدخال اسم المحطة','err');return;}
   const phoneEl=document.getElementById('f-phone');
-  const phone=CU&&CU.role==='admin'?phoneEl.value.trim():undefined;
+  const phone=CU&&CU.role==='admin'&&phoneEl?(phoneEl.value||'').trim():undefined;
   const body={name,tax:getDocFields('tax'),guarantee:getDocFields('guarantee'),social:getDocFields('social')};
   const eid=parseInt(document.getElementById('eid').value);
   const btn=document.getElementById('save-st-btn');
