@@ -110,14 +110,19 @@ def save_db(db):
 def save_file(key, name, data, mime):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO db_files (key, name, data, mime)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (key) DO UPDATE SET name=%s, data=%s, mime=%s
-    """, [key, name, data, mime, name, data, mime])
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute("""
+            INSERT INTO db_files (key, name, data, mime)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET name=%s, data=%s, mime=%s
+        """, [key, name, data, mime, name, data, mime])
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
 
 def load_file(key):
     conn = get_conn()
@@ -378,11 +383,14 @@ class Handler(BaseHTTPRequestHandler):
             parts = p.split("/")
             if len(parts) < 5: self.send_json({"error": "مسار خاطئ"}, 400); return
             sid, ftype = parts[3], parts[4]
-            body = self.read_body()
-            save_file(f"{sid}_{ftype}", body.get("name",""), body.get("data",""), body.get("mime",""))
-            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
-            add_log(u, "رفع ملف", f"رفع ملف: {body.get('name','')} للمحطة {sid}", ip)
-            self.send_json({"ok": True})
+            try:
+                body = self.read_body()
+                save_file(f"{sid}_{ftype}", body.get("name",""), body.get("data",""), body.get("mime",""))
+                ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+                add_log(u, "رفع ملف", f"رفع ملف: {body.get('name','')} للمحطة {sid}", ip)
+                self.send_json({"ok": True})
+            except Exception as e:
+                self.send_json({"error": f"خطأ في حفظ الملف: {str(e)}"}, 500)
         else:
             self.send_json({"error": "غير موجود"}, 404)
 
