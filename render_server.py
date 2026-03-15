@@ -158,6 +158,21 @@ def delete_session(token):
 
 
 
+sessions = {}
+
+def add_log(user, action, details, ip=""):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO db_logs (user_name, user_fullname, action, details, ip) VALUES (%s, %s, %s, %s, %s)",
+            [user.get("username",""), user.get("fullname",""), action, details, ip]
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except: pass
+
 def empty_doc():
     return {"bookNo": "", "bookDate": "", "expiry": "", "active": False}
 
