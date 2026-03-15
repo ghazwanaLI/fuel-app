@@ -2,8 +2,17 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>تدقيق اوليات المحطات الاهلية</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a4f1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="محطات OPDC">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -271,6 +280,100 @@ tr:hover td{background:var(--accent-dim2);}
 .btn-primary .spinner{border:2px solid rgba(255,255,255,.3);border-top-color:#fff;}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px){
+  :root{--sw:0px;}
+
+  /* Sidebar hidden by default on mobile */
+  .sidebar{
+    transform:translateX(100%);
+    transition:transform .3s ease;
+    z-index:500;
+    width:280px;
+  }
+  .sidebar.open{transform:translateX(0);}
+
+  /* Overlay when sidebar open */
+  .sb-overlay{
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,.5);z-index:499;
+  }
+  .sb-overlay.open{display:block;}
+
+  /* Main takes full width */
+  .main{margin-right:0;}
+
+  /* Header */
+  .header{padding:10px 14px;}
+  .h-title{font-size:14px;}
+  .h-right{gap:8px;}
+
+  /* Hamburger button */
+  .hamburger{
+    display:flex;flex-direction:column;gap:5px;
+    cursor:pointer;padding:6px;border-radius:8px;
+    background:var(--accent-dim);border:1px solid rgba(45,122,45,.2);
+  }
+  .hamburger span{
+    width:20px;height:2px;background:var(--accent);
+    border-radius:2px;transition:all .3s;display:block;
+  }
+
+  /* Content */
+  .content{padding:14px 12px;}
+
+  /* Stats grid - 2 columns on mobile */
+  .stats-grid{
+    grid-template-columns:1fr 1fr!important;
+    gap:10px!important;
+    margin-bottom:16px!important;
+  }
+  .sc{padding:16px 14px!important;}
+  .sc-val{font-size:36px!important;}
+  .sc-lbl{font-size:11px!important;}
+
+  /* Table - scrollable */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{font-size:12px;min-width:600px;}
+  th,td{padding:9px 10px;}
+
+  /* Modals */
+  .modal{
+    width:96vw!important;
+    padding:20px 16px;
+    border-radius:16px;
+    max-height:90vh;
+  }
+  .fgrid{grid-template-columns:1fr!important;}
+  .fg.full{grid-column:1!important;}
+  .doc-fields{grid-template-columns:1fr!important;}
+  .docs-cards{grid-template-columns:1fr!important;}
+  .perm-grid{grid-template-columns:1fr!important;}
+
+  /* Search box */
+  .search-box input{width:160px!important;}
+  .search-box input:focus{width:180px!important;}
+
+  /* Buttons */
+  .btn{padding:7px 12px;font-size:12px;}
+  .btn-sm{padding:5px 8px;font-size:11px;}
+
+  /* Section header */
+  .sec-hdr{padding:12px 14px;}
+  .sec-actions{gap:6px;}
+
+  /* Alert bar */
+  .alert-bar{padding:10px 12px;}
+
+  /* Login */
+  .lbox{padding:28px 20px;width:92vw;}
+}
+
+@media (max-width: 400px){
+  .stats-grid{grid-template-columns:1fr!important;}
+  .h-title{font-size:13px;}
+}
 </style>
 </head>
 <body>
@@ -331,8 +434,12 @@ tr:hover td{background:var(--accent-dim2);}
         <div id="vbadge" class="vbadge" style="display:none">👁️ مشاهدة فقط</div>
         <div style="font-size:12px;color:var(--t3)" id="hdate"></div>
         <button class="btn btn-primary" id="btn-add" onclick="openStationModal()" style="display:none">➕ إضافة محطة</button>
+        <div class="hamburger" onclick="toggleSidebar()" id="hamburger" style="display:none">
+          <span></span><span></span><span></span>
+        </div>
       </div>
     </header>
+    <div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
 
     <div class="content">
 
@@ -1031,6 +1138,37 @@ function showWelcome(){
 }
 
 tryAutoLogin();
+
+// ── PWA Service Worker ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
+
+// ── MOBILE SIDEBAR ──
+function isMobile(){return window.innerWidth<=768;}
+function toggleSidebar(){
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sb-overlay').classList.toggle('open');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sb-overlay').classList.remove('open');
+}
+// Show hamburger on mobile
+function checkMobile(){
+  const hb=document.getElementById('hamburger');
+  if(hb) hb.style.display=isMobile()?'flex':'none';
+}
+window.addEventListener('resize', checkMobile);
+window.addEventListener('load', checkMobile);
+// Close sidebar when nav item clicked on mobile
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click',()=>{ if(isMobile()) closeSidebar(); });
+});
 </script>
 </body>
 </html>
