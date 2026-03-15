@@ -6,8 +6,7 @@
 import json, os, hashlib, uuid, base64, io
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import pg8000
 
 PORT = int(os.environ.get("PORT", 8080))
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -16,7 +15,14 @@ def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    import urllib.parse
+    r = urllib.parse.urlparse(DATABASE_URL)
+    return pg8000.connect(
+        host=r.hostname, port=r.port or 5432,
+        database=r.path.lstrip("/"),
+        user=r.username, password=r.password,
+        ssl_context=True
+    )
 
 def init_db():
     conn = get_conn()
