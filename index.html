@@ -722,10 +722,15 @@ const DOCS=[
 
 // ── API ──
 async function api(method,path,body=null){
-  const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:body?JSON.stringify(body):null});
-  const d=await r.json();
-  if(!r.ok) throw new Error(d.error||'خطأ');
-  return d;
+  try{
+    const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:body?JSON.stringify(body):null});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||`خطأ ${r.status}`);
+    return d;
+  }catch(e){
+    if(e.message==='Failed to fetch') throw new Error('لا يوجد اتصال بالسيرفر');
+    throw e;
+  }
 }
 
 // ── TOAST ──
@@ -974,7 +979,7 @@ async function delStation(id){
 // ── FILE UPLOAD ──
 function doUpload(e,type){
   const file=e.target.files[0];if(!file)return;
-  if(file.size>5*1024*1024){toast('الملف أكبر من 5MB','err');e.target.value='';return;}
+  if(file.size>2*1024*1024){toast('الملف أكبر من 2MB — يرجى ضغط الملف أولاً','err');e.target.value='';return;}
   const r=new FileReader();
   r.onload=ev=>{TF[type]={name:file.name,data:ev.target.result,mime:file.type};setBox(type,file.name);};
   r.readAsDataURL(file);
