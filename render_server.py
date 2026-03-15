@@ -48,7 +48,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT NOW()
         )
     """)
-    conn.commit()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS db_logs (
+            id SERIAL PRIMARY KEY,
+            user_name TEXT,
+            user_fullname TEXT,
+            action TEXT,
+            details TEXT,
+            ip TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
     conn.commit()
     # تهيئة البيانات الافتراضية
     cur.execute("SELECT value FROM db_store WHERE key='data'")
@@ -252,6 +262,18 @@ class Handler(BaseHTTPRequestHandler):
             sid, ftype = parts[3], parts[4]
             f = load_file(f"{sid}_{ftype}")
             self.send_json({"ok": True, "file": f})
+        elif p == "/api/logs":
+            u = self.require_auth()
+            if not u: return
+            if u["role"] != "admin": self.send_json({"error": "غير مصرح"}, 403); return
+            limit = int(urlparse(self.path).query.replace("limit=","") or 100)
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute("SELECT id,user_name,user_fullname,action,details,ip,created_at FROM db_logs ORDER BY created_at DESC LIMIT %s", [limit])
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            logs = [{"id":r[0],"username":r[1],"fullname":r[2],"action":r[3],"details":r[4],"ip":r[5],"time":str(r[6])} for r in rows]
+            self.send_json({"ok":True,"logs":logs})
         else:
             self.send_json({"error": "غير موجود"}, 404)
 
@@ -296,6 +318,8 @@ class Handler(BaseHTTPRequestHandler):
                 "updated_at": now,
             }
             db["stations"].append(station); save_db(db)
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+            add_log(u, "إضافة محطة", f"أضاف محطة: {station['name']}", ip)
             self.send_json({"ok": True, "station": station})
 
         elif p == "/api/users":
@@ -314,6 +338,8 @@ class Handler(BaseHTTPRequestHandler):
                          if role == "admin" else body.get("perms", {"view":True,"edit":False,"del":False,"files":False,"export":False,"docs":True})
             }
             db["users"].append(new_user); save_db(db)
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+            add_log(u, "إضافة مستخدم", f"أضاف مستخدم: {new_user['fullname']} ({new_user['username']})", ip)
             self.send_json({"ok": True, "user": {k: v for k, v in new_user.items() if k != "password"}})
 
         elif p == "/api/import-excel":
@@ -354,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
             sid, ftype = parts[3], parts[4]
             body = self.read_body()
             save_file(f"{sid}_{ftype}", body.get("name",""), body.get("data",""), body.get("mime",""))
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+            add_log(u, "رفع ملف", f"رفع ملف: {body.get('name','')} للمحطة {sid}", ip)
             self.send_json({"ok": True})
         else:
             self.send_json({"error": "غير موجود"}, 404)
@@ -376,6 +404,8 @@ class Handler(BaseHTTPRequestHandler):
             from datetime import datetime
             s["updated_by"] = u["fullname"]
             s["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+            add_log(u, "تعديل محطة", f"عدّل محطة: {s['name']}", ip)
             save_db(db); self.send_json({"ok": True, "station": s})
 
         elif p.startswith("/api/users/"):
@@ -388,6 +418,8 @@ class Handler(BaseHTTPRequestHandler):
                     if db["users"][idx]["password"] != hash_pw(body["old_password"]):
                         self.send_json({"error": "كلمة المرور الحالية غير صحيحة"}, 400); return
                 db["users"][idx]["password"] = hash_pw(body["password"])
+                ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+                add_log(u, "تغيير كلمة المرور", f"غيّر كلمة مرور المستخدم id={uid}", ip)
             for f in ["fullname", "username", "role", "active", "perms"]:
                 if f in body: db["users"][idx][f] = body[f]
             save_db(db)
@@ -412,8 +444,12 @@ class Handler(BaseHTTPRequestHandler):
             uid = int(p.split("/")[-1])
             if uid == u["id"]: self.send_json({"error": "لا يمكن حذف حسابك"}, 400); return
             db = load_db()
+            deleted_u = next((x for x in db["users"] if x["id"]==uid), {})
             db["users"] = [x for x in db["users"] if x["id"] != uid]
-            save_db(db); self.send_json({"ok": True})
+            save_db(db)
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+            add_log(u, "حذف مستخدم", f"حذف مستخدم: {deleted_u.get('fullname','')}", ip)
+            self.send_json({"ok": True})
 
         elif p.startswith("/api/files/"):
             if not self.can(u, "files"): self.send_json({"error": "لا صلاحية"}, 403); return
