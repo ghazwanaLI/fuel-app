@@ -951,7 +951,16 @@ async function saveStation(){
       const d=await api('POST','/api/stations',body);
       sid=d.station.id;
     }
-    for(const t of['tax','guarantee','social']){if(TF[t])await api('POST',`/api/files/${sid}/${t}`,TF[t]);}
+    for(const t of['tax','guarantee','social']){
+      if(TF[t]){
+        try{
+          await api('POST',`/api/files/${sid}/${t}`,TF[t]);
+        }catch(fe){
+          console.error('File upload error for',t,fe);
+          toast(`تحذير: لم يُحفظ ملف ${t} — ${fe.message}`,'err');
+        }
+      }
+    }
     toast('تم الحفظ بنجاح ✅');closeModal('ov-station');await loadStations();
   }catch(e){toast('خطأ: '+e.message,'err');}
   finally{btn.disabled=false;btn.textContent='💾 حفظ';}
