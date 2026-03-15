@@ -411,6 +411,7 @@ tr:hover td{background:var(--accent-dim2);}
       <div class="nav-item" onclick="goTab('dashboard',this)"><span class="ni">⚠️</span>انتهاء صلاحية المستندات<span class="nbadge" id="alert-count">0</span></div>
       <div class="nav-sect" id="admin-sect" style="display:none">الإدارة</div>
       <div class="nav-item" id="nav-users" onclick="goTab('users',this)" style="display:none"><span class="ni">👥</span>المستخدمون</div>
+      <div class="nav-item" id="nav-logs" onclick="goTab('logs',this)" style="display:none"><span class="ni">📋</span>سجل النشاط</div>
       <div class="nav-item" id="nav-import" onclick="document.getElementById('excel-input').click()" style="display:none"><span class="ni">📥</span>استيراد Excel</div>
       <input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none" onchange="importExcel(event)">
     </nav>
@@ -494,6 +495,30 @@ tr:hover td{background:var(--accent-dim2);}
           </div>
           <div class="table-wrap"><table><thead><tr id="th2"></tr></thead><tbody id="tb2"></tbody></table></div>
           <div class="pagination" id="pg2"></div>
+        </div>
+      </div>
+
+      <!-- LOGS TAB -->
+      <div id="tab-logs" style="display:none">
+        <div class="section">
+          <div class="sec-hdr">
+            <div class="sec-actions">
+              <select class="fi" id="log-limit" onchange="loadLogs()" style="width:120px;padding:7px 12px">
+                <option value="50">آخر 50</option>
+                <option value="100" selected>آخر 100</option>
+                <option value="200">آخر 200</option>
+                <option value="500">آخر 500</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="loadLogs()">🔄 تحديث</button>
+            </div>
+            <div class="sec-title"><div class="sdot"></div>📋 سجل النشاط</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th><th>IP</th><th>الوقت</th></tr></thead>
+              <tbody id="logs-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -748,6 +773,7 @@ function initUI(){
   if(!can('export')) document.getElementById('btn-export').style.display='none';
   document.getElementById('nav-add-station').style.display=can('edit')?'flex':'none';
   document.getElementById('nav-users').style.display=CU.role==='admin'?'flex':'none';
+  document.getElementById('nav-logs').style.display=CU.role==='admin'?'flex':'none';
   document.getElementById('nav-import').style.display=can('edit')?'flex':'none';
   document.getElementById('admin-sect').style.display=CU.role==='admin'?'block':'none';
   buildHeaders();
@@ -756,11 +782,12 @@ function initUI(){
 
 // ── TABS ──
 function goTab(name,el){
-  ['dashboard','stations','users'].forEach(t=>document.getElementById('tab-'+t).style.display=t===name?'block':'none');
+  ['dashboard','stations','users','logs'].forEach(t=>document.getElementById('tab-'+t).style.display=t===name?'block':'none');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   if(name==='stations'){sP2=1;renderT2();}
   if(name==='users')loadUsers();
+  if(name==='logs')loadLogs();
 }
 
 // ── UTILS ──
@@ -1066,6 +1093,30 @@ function openLB(key){const f=window._docsFiles&&window._docsFiles[key];if(!f)ret
 function closeLB(){document.getElementById('lightbox').classList.remove('open');}
 function dlDoc(key){const f=window._docsFiles&&window._docsFiles[key];if(!f)return;const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();}
 async function delDoc(key){if(!confirm('حذف هذا الملف؟'))return;try{await api('DELETE',`/api/files/${docsId}/${key}`);toast('تم الحذف');openDocs(docsId);}catch(e){toast('خطأ','err');}}
+
+// ── LOGS ──
+const LOG_COLORS={
+  'تسجيل دخول':'var(--a3)','تسجيل خروج':'var(--t3)',
+  'إضافة محطة':'var(--a4)','تعديل محطة':'var(--warn)','حذف محطة':'var(--a2)',
+  'رفع ملف':'var(--a4)','حذف ملف':'var(--a2)',
+  'إضافة مستخدم':'var(--a4)','حذف مستخدم':'var(--a2)',
+  'تغيير كلمة المرور':'var(--warn)'
+};
+async function loadLogs(){
+  try{
+    const limit=document.getElementById('log-limit')?.value||100;
+    const d=await api('GET',`/api/logs?limit=${limit}`);
+    document.getElementById('logs-tbody').innerHTML=d.logs.map((l,i)=>`
+      <tr>
+        <td><span class="snum">${i+1}</span></td>
+        <td><div style="font-weight:700;font-size:13px">${l.fullname}</div><div style="font-size:11px;color:var(--t3)">${l.username}</div></td>
+        <td><span style="background:${LOG_COLORS[l.action]||'var(--t3)'};color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">${l.action}</span></td>
+        <td style="font-size:12px;color:var(--t2);max-width:250px;white-space:normal">${l.details}</td>
+        <td style="font-size:11px;color:var(--t3)">${l.ip||'—'}</td>
+        <td style="font-size:11px;color:var(--t3);white-space:nowrap">${l.time?l.time.substring(0,16).replace('T',' '):''}</td>
+      </tr>`).join('');
+  }catch(e){toast('خطأ في تحميل السجل','err');}
+}
 
 // ── CHANGE PASSWORD ──
 function openChangePw(){
