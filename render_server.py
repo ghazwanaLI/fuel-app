@@ -41,6 +41,13 @@ def init_db():
             mime TEXT
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS db_sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
     conn.commit()
     conn.commit()
     # تهيئة البيانات الافتراضية
@@ -113,15 +120,28 @@ def load_file(key):
         return {"name": row[0], "data": row[1], "mime": row[2]}
     return None
 
-def delete_file(key):
+def save_session(token, user_id):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("DELETE FROM db_files WHERE key=%s", [key])
-    conn.commit()
-    cur.close()
-    conn.close()
+    cur.execute("INSERT INTO db_sessions (token, user_id) VALUES (%s, %s) ON CONFLICT (token) DO UPDATE SET user_id=%s", [token, user_id, user_id])
+    conn.commit(); cur.close(); conn.close()
 
-sessions = {}
+def get_session(token):
+    if not token: return None
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM db_sessions WHERE token=%s", [token])
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row[0] if row else None
+
+def delete_session(token):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM db_sessions WHERE token=%s", [token])
+    conn.commit(); cur.close(); conn.close()
+
+
 
 def empty_doc():
     return {"bookNo": "", "bookDate": "", "expiry": "", "active": False}
@@ -155,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.headers.get("Authorization", "").replace("Bearer ", "").strip()
 
     def get_user(self):
-        uid = sessions.get(self.get_token())
+        uid = get_session(self.get_token())
         if not uid: return None
         return next((u for u in load_db()["users"] if u["id"] == uid), None)
 
@@ -247,12 +267,12 @@ class Handler(BaseHTTPRequestHandler):
                          and u.get("active", True)), None)
             if not user: self.send_json({"error": "اسم المستخدم أو كلمة المرور غير صحيحة"}, 401); return
             token = str(uuid.uuid4())
-            sessions[token] = user["id"]
+            save_session(token, user["id"])
             self.send_json({"ok": True, "token": token, "user": {k: v for k, v in user.items() if k != "password"}})
             return
 
         if p == "/api/logout":
-            sessions.pop(self.get_token(), None)
+            delete_session(self.get_token())
             self.send_json({"ok": True}); return
 
         u = self.require_auth()
