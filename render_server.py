@@ -33,6 +33,15 @@ def init_db():
             value TEXT
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS db_files (
+            key TEXT PRIMARY KEY,
+            name TEXT,
+            data TEXT,
+            mime TEXT
+        )
+    """)
+    conn.commit()
     conn.commit()
     # تهيئة البيانات الافتراضية
     cur.execute("SELECT value FROM db_store WHERE key='data'")
@@ -77,6 +86,37 @@ def save_db(db):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("UPDATE db_store SET value=%s WHERE key='data'", [json.dumps(db, ensure_ascii=False)])
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def save_file(key, name, data, mime):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO db_files (key, name, data, mime)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (key) DO UPDATE SET name=%s, data=%s, mime=%s
+    """, [key, name, data, mime, name, data, mime])
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def load_file(key):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT name, data, mime FROM db_files WHERE key=%s", [key])
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if row:
+        return {"name": row[0], "data": row[1], "mime": row[2]}
+    return None
+
+def delete_file(key):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM db_files WHERE key=%s", [key])
     conn.commit()
     cur.close()
     conn.close()
@@ -190,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             parts = p.split("/")
             if len(parts) < 5: self.send_json({"error": "مسار خاطئ"}, 400); return
             sid, ftype = parts[3], parts[4]
-            f = load_db()["files"].get(f"{sid}_{ftype}")
+            f = load_file(f"{sid}_{ftype}")
             self.send_json({"ok": True, "file": f})
         else:
             self.send_json({"error": "غير موجود"}, 404)
@@ -292,9 +332,9 @@ class Handler(BaseHTTPRequestHandler):
             parts = p.split("/")
             if len(parts) < 5: self.send_json({"error": "مسار خاطئ"}, 400); return
             sid, ftype = parts[3], parts[4]
-            body = self.read_body(); db = load_db()
-            db["files"][f"{sid}_{ftype}"] = {"name": body.get("name", ""), "data": body.get("data", ""), "mime": body.get("mime", "")}
-            save_db(db); self.send_json({"ok": True})
+            body = self.read_body()
+            save_file(f"{sid}_{ftype}", body.get("name",""), body.get("data",""), body.get("mime",""))
+            self.send_json({"ok": True})
         else:
             self.send_json({"error": "غير موجود"}, 404)
 
@@ -358,8 +398,8 @@ class Handler(BaseHTTPRequestHandler):
         elif p.startswith("/api/files/"):
             if not self.can(u, "files"): self.send_json({"error": "لا صلاحية"}, 403); return
             parts = p.split("/"); sid, ftype = parts[3], parts[4]
-            db = load_db(); db["files"].pop(f"{sid}_{ftype}", None)
-            save_db(db); self.send_json({"ok": True})
+            delete_file(f"{sid}_{ftype}")
+            self.send_json({"ok": True})
         else:
             self.send_json({"error": "غير موجود"}, 404)
 
