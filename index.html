@@ -815,19 +815,20 @@ async function doLogin(){
     TOKEN=d.token;CU=d.user;localStorage.setItem('fv4_token',TOKEN);
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
-    initUI();await loadStations();showWelcome();
+    initUI();await loadStations();showWelcome();connectSSE();
   }catch(e){err.textContent=e.message;err.style.display='block';}
   finally{btn.disabled=false;btn.textContent='دخول ←';}
 }
 async function doLogout(){
   try{await api('POST','/api/logout');}catch(e){}
+  if(_sseSource){_sseSource.close();_sseSource=null;}
   TOKEN='';CU=null;localStorage.removeItem('fv4_token');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app').style.display='none';
 }
 async function tryAutoLogin(){
   if(!TOKEN)return;
-  try{const d=await api('GET','/api/me');CU=d.user;document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';initUI();await loadStations();}
+  try{const d=await api('GET','/api/me');CU=d.user;document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';initUI();await loadStations();connectSSE();}
   catch(e){TOKEN='';localStorage.removeItem('fv4_token');}
 }
 function can(p){if(!CU)return false;if(CU.role==='admin')return true;return !!(CU.perms&&CU.perms[p]);}
@@ -1342,8 +1343,7 @@ function exportCSV(){
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closeOv(e,id){if(e.target===document.getElementById(id))closeModal(id);}
 
-// ── AUTO REFRESH ──
-setInterval(()=>{if(CU)loadStations();},30000);
+// ── AUTO REFRESH handled by SSE ──
 
 // ── WELCOME ──
 function showWelcome(){
@@ -1356,6 +1356,22 @@ function showWelcome(){
 }
 
 tryAutoLogin();
+
+// ── REAL-TIME SSE ──
+let _sseSource = null;
+function connectSSE(){
+  if(!TOKEN) return;
+  if(_sseSource) _sseSource.close();
+  _sseSource = new EventSource(`/api/events?t=${TOKEN}`);
+  _sseSource.onmessage = (e) => {
+    if(e.data === 'update') loadStations();
+  };
+  _sseSource.onerror = () => {
+    _sseSource.close();
+    // إعادة المحاولة بعد 5 ثواني
+    setTimeout(()=>{ if(CU) connectSSE(); }, 5000);
+  };
+}
 
 // ── PWA Service Worker ──
 if('serviceWorker' in navigator){
