@@ -1088,7 +1088,6 @@ function renderStats(){
     document.getElementById('as-chevron').classList.add('open');
   }
 }
-function toggleAlertStrip(){
 function showCardDetail(type){
   const cfg={
     tax:{icon:'🧾',title:'التحاسب الضريبي — منتهي أو قارب الانتهاء',filter:s=>s.tax&&s.tax.active&&du(s.tax.expiry)<=30,docKey:'tax'},
