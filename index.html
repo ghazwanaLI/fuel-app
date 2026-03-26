@@ -532,8 +532,12 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
           <div class="alert-strip-body" id="alert-strip-body">
             <div class="alert-rows" id="alert-rows"></div>
             <div class="alert-strip-footer">
+              <button class="as-dismiss" onclick="sendAllWhatsApp()" style="color:#25d366;border:1.5px solid #25d366;background:rgba(37,211,102,.06);padding:5px 14px;border-radius:8px;font-family:'Cairo',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;margin-left:4px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                إرسال للكل
+              </button>
               <span class="as-footer-hint">اضغط على الشريط للطي</span>
-              <button class="as-dismiss" onclick="dismissAlerts()">إخفاء التنبيهات ✕</button>
+              <button class="as-dismiss" onclick="dismissAlerts()">إخفاء ✕</button>
             </div>
           </div>
         </div>
@@ -617,6 +621,8 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
         <input class="fi" id="fn" type="text" placeholder="مثال: محطة الأمل">
       </div>
       <div class="fg full">
+        <label class="fl">📱 رقم الواتساب (مع رمز الدولة)</label>
+        <input class="fi" id="fphone" type="tel" placeholder="مثال: 9647701234567" dir="ltr" style="text-align:right">
       </div>
     </div>
 
@@ -870,6 +876,46 @@ function docStatus(doc){
 }
 
 // ── TABLE HEADERS ──
+function buildWhatsAppMsg(s){
+  const docLabels={tax:'التحاسب الضريبي',guarantee:'خطاب الضمان',social:'الضمان الاجتماعي'};
+  const expiring=DOCS.filter(d=>{
+    const doc=s[d.key];
+    return doc&&doc.active&&du(doc.expiry)<=30;
+  });
+  if(!expiring.length) return null;
+  const lines=expiring.map(d=>{
+    const doc=s[d.key];
+    const n=du(doc.expiry);
+    return `• ${d.label}: ${n<0?'منتهية منذ '+Math.abs(n)+' يوم':'تنتهي خلال '+n+' يوم ('+fd(doc.expiry)+')'}`;
+  });
+  return `السلام عليكم،\nنود تنبيهكم بأن الوثائق التالية لـ *${s.name}* تحتاج إلى تجديد:\n\n${lines.join('\n')}\n\nيرجى مراجعة الجهات المختصة في أقرب وقت.\nشكراً لتعاونكم 🙏`;
+}
+
+function sendWhatsApp(id){
+  const s=allStations.find(x=>x.id===id);
+  if(!s){toast('لم يتم العثور على المحطة','err');return;}
+  if(!s.phone){toast('لا يوجد رقم واتساب لهذه المحطة','err');return;}
+  const msg=buildWhatsAppMsg(s);
+  if(!msg){toast('لا توجد وثائق منتهية أو قاربت الانتهاء','err');return;}
+  const phone=s.phone.replace(/[^0-9]/g,'');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function sendAllWhatsApp(){
+  const stations=allStations.filter(s=>s.phone&&DOCS.some(d=>{const doc=s[d.key];return doc&&doc.active&&du(doc.expiry)<=30;}));
+  if(!stations.length){toast('لا توجد محطات بأرقام واتساب وتنبيهات','err');return;}
+  let i=0;
+  function sendNext(){
+    if(i>=stations.length){toast(`تم فتح ${stations.length} محادثة واتساب ✅`);return;}
+    const s=stations[i++];
+    const msg=buildWhatsAppMsg(s);
+    const phone=s.phone.replace(/[^0-9]/g,'');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+    setTimeout(sendNext,800);
+  }
+  sendNext();
+}
+
 function buildHeaders(){
   const docs=`
     <th style="min-width:140px">🧾 تحاسب ضريبي</th>
@@ -878,36 +924,33 @@ function buildHeaders(){
   `;
   const h=`<th style="width:44px;text-align:center">#</th><th style="min-width:170px">اسم المحطة</th>${docs}<th style="width:130px">✏️ آخر تعديل</th>`
     +(can('docs')?'<th style="width:80px;text-align:center">الوثائق</th>':'')
+    +'<th style="width:72px;text-align:center">واتساب</th>'
     +(can('del')?'<th style="width:80px;text-align:center">حذف</th>':'');
   document.getElementById('th2').innerHTML=h;
 }
 
-// ── STATION ROW ──
 function docCell(doc){
-  if(!doc||!doc.active) return `
-    <td>
-      <div style="display:flex;align-items:center;gap:7px">
-        <span class="badge bn" style="font-size:11px">✗ غير نشط</span>
-      </div>
-    </td>`;
+  if(!doc||!doc.active) return `<td><span class="badge bn" style="font-size:11px">✗ غير نشط</span></td>`;
   const es=eS(doc.expiry);
-  const color=es.dot==='e-exp'?'var(--a2)':es.dot==='e-soon'?'var(--warn)':'var(--a3)';
   const statusLbl=es.dot==='e-exp'?'منتهية':es.dot==='e-soon'?'قريباً':'سارية';
-  return `
-    <td>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <span class="badge ${es.cls}" style="align-self:flex-start">
-          <span class="edot ${es.dot}" style="margin-left:4px"></span>
-          ${statusLbl}
-        </span>
-        <span style="font-size:11px;color:var(--t2);font-weight:600;padding-right:2px">${fd(doc.expiry)}</span>
-      </div>
-    </td>`;
+  return `<td>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span class="badge ${es.cls}" style="align-self:flex-start"><span class="edot ${es.dot}" style="margin-left:4px"></span>${statusLbl}</span>
+      <span style="font-size:11px;color:var(--t2);font-weight:600;padding-right:2px">${fd(doc.expiry)}</span>
+    </div>
+  </td>`;
 }
+
 function sRow(s,n){
   const nameCell=can('edit')
     ?`<td style="min-width:170px"><strong style="font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted;" onclick="editStation(${s.id})">${s.name}</strong></td>`
     :`<td style="min-width:170px"><strong style="font-size:13px">${s.name}</strong></td>`;
+  const hasAlert=DOCS.some(d=>{const doc=s[d.key];return doc&&doc.active&&du(doc.expiry)<=30;});
+  const waBtn=s.phone
+    ?`<button class="btn btn-sm" style="background:${hasAlert?'#25d366':'#f0faf4'};color:${hasAlert?'#fff':'#25d366'};border:1.5px solid ${hasAlert?'#25d366':'#c3e6cb'};padding:5px 9px;font-size:15px;border-radius:9px;" onclick="sendWhatsApp(${s.id})" title="${s.phone}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </button>`
+    :`<button class="btn btn-sm" style="background:#f5f5f5;color:#ccc;border:1.5px solid #e5e5e5;padding:5px 9px;font-size:13px;border-radius:9px;cursor:not-allowed" title="لا يوجد رقم">—</button>`;
   return `<tr>
     <td style="text-align:center;width:44px"><span class="snum">${n}</span></td>
     ${nameCell}
@@ -918,10 +961,10 @@ function sRow(s,n){
       ${s.updated_by?`<div style="font-weight:700;font-size:12px">${s.updated_by}</div><div style="color:var(--t3);font-size:10px;margin-top:2px">${(s.updated_at||'').substring(0,16).replace('T',' ')}</div>`:'<span style="color:var(--t3)">—</span>'}
     </td>
     ${can('docs')?`<td style="text-align:center;width:80px"><button class="btn btn-outline btn-sm" onclick="openDocs(${s.id})">📂</button></td>`:''}
-    ${can('del')?`<td style="text-align:center;width:90px"><button class="btn btn-sm btn-red" onclick="delStation(${s.id})" title="حذف">🗑️</button></td>`:''}
+    <td style="text-align:center;width:72px">${waBtn}</td>
+    ${can('del')?`<td style="text-align:center;width:80px"><button class="btn btn-sm btn-red" onclick="delStation(${s.id})" title="حذف">🗑️</button></td>`:''}
   </tr>`;
 }
-
 // ── STATS ──
 let _stripOpen=false;
 function renderStats(){
@@ -1027,8 +1070,7 @@ function openStationModal(){
   document.getElementById('sm-ttl').textContent='إضافة محطة جديدة';
   document.getElementById('eid').value='';
   document.getElementById('fn').value='';
-  // حقل الهاتف للمدير فقط
-  const isAdminUser=CU&&CU.role==='admin';
+  document.getElementById('fphone').value='';
   ['tax','guarantee','social'].forEach(k=>resetDocFields(k));
   clearUploads();
   document.getElementById('ov-station').classList.add('open');
@@ -1038,8 +1080,7 @@ function editStation(id){
   document.getElementById('sm-ttl').textContent='تعديل بيانات المحطة';
   document.getElementById('eid').value=id;
   document.getElementById('fn').value=s.name;
-  // إظهار حقل الهاتف للمدير فقط
-  const isAdminUser=CU&&CU.role==='admin';
+  document.getElementById('fphone').value=s.phone||'';
   ['tax','guarantee','social'].forEach(k=>fillDocFields(k,s[k]||{}));
   clearUploads();
   document.getElementById('ov-station').classList.add('open');
@@ -1047,9 +1088,8 @@ function editStation(id){
 async function saveStation(){
   const name=document.getElementById('fn').value.trim();
   if(!name){toast('الرجاء إدخال اسم المحطة','err');return;}
-  const phoneEl=document.getElementById('f-phone');
-  const phone=CU&&CU.role==='admin'&&phoneEl?(phoneEl.value||'').trim():undefined;
-  const body={name,tax:getDocFields('tax'),guarantee:getDocFields('guarantee'),social:getDocFields('social')};
+  const phone=(document.getElementById('fphone').value||'').trim().replace(/\s+/g,'');
+  const body={name,phone,tax:getDocFields('tax'),guarantee:getDocFields('guarantee'),social:getDocFields('social')};
   const eid=parseInt(document.getElementById('eid').value);
   const btn=document.getElementById('save-st-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> جاري الحفظ';
@@ -1058,7 +1098,6 @@ async function saveStation(){
     if(eid){
       await api('PUT',`/api/stations/${eid}`,body);
       sid=eid;
-      // تحديث فوري في الذاكرة
       const idx=allStations.findIndex(s=>s.id===eid);
       if(idx!==-1) allStations[idx]={...allStations[idx],...body};
     }else{
@@ -1068,11 +1107,8 @@ async function saveStation(){
     for(const t of['tax','guarantee','social']){
       if(TF[t]){
         try{
-          console.log('Uploading file for',t,'size:',TF[t].data?.length);
           const res=await api('POST',`/api/files/${sid}/${t}`,TF[t]);
-          console.log('Upload result',t,res);
         }catch(fe){
-          console.error('File upload error for',t,fe.message);
           toast(`خطأ رفع ملف ${t}: ${fe.message}`,'err');
         }
       }
