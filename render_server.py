@@ -8,18 +8,22 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 import pg8000
 
-# ── SSE: قائمة المتصلين ──
+# ── SSE: قائمة المتصلين + عداد الإصدار ──
 _sse_clients = []
 _sse_lock = threading.Lock()
+_version = 0
 
 def sse_broadcast(event="update"):
-    """يرسل إشارة لجميع المتصلين"""
+    """يرسل الإصدار الجديد لجميع المتصلين"""
+    global _version
+    _version += 1
+    msg = f"{event}:{_version}"
     dead = []
     with _sse_lock:
         clients = list(_sse_clients)
     for q in clients:
         try:
-            q.put(event)
+            q.put(msg)
         except:
             dead.append(q)
     if dead:
@@ -299,8 +303,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                # إرسال ping أولي
-                self.wfile.write(b"data: connected\n\n")
+                # إرسال الإصدار الحالي فوراً عند الاتصال
+                self.wfile.write(f"data: connected:{_version}\n\n".encode("utf-8"))
                 self.wfile.flush()
                 while True:
                     try:
