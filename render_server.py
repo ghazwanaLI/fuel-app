@@ -3,18 +3,17 @@
 نظام تدقيق اوليات المحطات الاهلية
 نسخة Render.com مع PostgreSQL
 """
-import json, os, hashlib, uuid, base64, io, threading
+import json, os, hashlib, uuid, base64, io, threading, queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 import pg8000
 
-# ── SSE: قائمة المتصلين + عداد الإصدار ──
+# ── SSE ──
 _sse_clients = []
 _sse_lock = threading.Lock()
 _version = 0
 
 def sse_broadcast(event="update"):
-    """يرسل الإصدار الجديد لجميع المتصلين"""
     global _version
     _version += 1
     msg = f"{event}:{_version}"
@@ -22,15 +21,12 @@ def sse_broadcast(event="update"):
     with _sse_lock:
         clients = list(_sse_clients)
     for q in clients:
-        try:
-            q.put(msg)
-        except:
-            dead.append(q)
+        try: q.put(msg)
+        except: dead.append(q)
     if dead:
         with _sse_lock:
             for q in dead:
-                if q in _sse_clients:
-                    _sse_clients.remove(q)
+                if q in _sse_clients: _sse_clients.remove(q)
 
 PORT = int(os.environ.get("PORT", 8080))
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -234,7 +230,12 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(data.decode("utf-8"))
 
     def get_token(self):
-        return self.headers.get("Authorization", "").replace("Bearer ", "").strip()
+        # EventSource لا يدعم headers — نقرأ التوكن من query param أيضاً
+        token = self.headers.get("Authorization", "").replace("Bearer ", "").strip()
+        if not token:
+            qs = parse_qs(urlparse(self.path).query)
+            token = qs.get("t", [""])[0]
+        return token
 
     def get_user(self):
         uid = get_session(self.get_token())
@@ -289,8 +290,6 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if p == "/api/events":
-            # ── SSE endpoint ──
-            import queue
             u = self.require_auth()
             if not u: return
             q = queue.Queue()
@@ -303,25 +302,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                # إرسال الإصدار الحالي فوراً عند الاتصال
-                self.wfile.write(f"data: connected:{_version}\n\n".encode("utf-8"))
+                self.wfile.write(f"data: connected:{_version}\n\n".encode())
                 self.wfile.flush()
                 while True:
                     try:
-                        event = q.get(timeout=25)
-                        msg = f"data: {event}\n\n".encode("utf-8")
-                        self.wfile.write(msg)
+                        msg = q.get(timeout=25)
+                        self.wfile.write(f"data: {msg}\n\n".encode())
                         self.wfile.flush()
                     except:
-                        # ping للإبقاء على الاتصال
                         self.wfile.write(b": ping\n\n")
                         self.wfile.flush()
-            except:
-                pass
+            except: pass
             finally:
                 with _sse_lock:
-                    if q in _sse_clients:
-                        _sse_clients.remove(q)
+                    if q in _sse_clients: _sse_clients.remove(q)
             return
 
         if p == "/api/stations":
@@ -405,10 +399,9 @@ class Handler(BaseHTTPRequestHandler):
                 "updated_by": u["fullname"],
                 "updated_at": now,
             }
-            db["stations"].append(station); save_db(db)
+            db["stations"].append(station); save_db(db); sse_broadcast()
             ip = self.headers.get("X-Forwarded-For", self.client_address[0])
             add_log(u, "إضافة محطة", f"أضاف محطة: {station['name']}", ip)
-            sse_broadcast("update")
             self.send_json({"ok": True, "station": station})
 
         elif p == "/api/users":
@@ -426,10 +419,9 @@ class Handler(BaseHTTPRequestHandler):
                 "perms": {"view":True,"edit":True,"del":True,"files":True,"export":True,"docs":True}
                          if role == "admin" else body.get("perms", {"view":True,"edit":False,"del":False,"files":False,"export":False,"docs":True})
             }
-            db["users"].append(new_user); save_db(db)
+            db["users"].append(new_user); save_db(db); sse_broadcast()
             ip = self.headers.get("X-Forwarded-For", self.client_address[0])
             add_log(u, "إضافة مستخدم", f"أضاف مستخدم: {new_user['fullname']} ({new_user['username']})", ip)
-            sse_broadcast("update")
             self.send_json({"ok": True, "user": {k: v for k, v in new_user.items() if k != "password"}})
 
         elif p == "/api/import-excel":
@@ -458,8 +450,7 @@ class Handler(BaseHTTPRequestHandler):
                         "tax":       empty_doc(), "guarantee": empty_doc(), "social": empty_doc(),
                     })
                     existing_names.add(name); added += 1
-                save_db(db)
-                sse_broadcast("update")
+                save_db(db); sse_broadcast()
                 self.send_json({"ok": True, "added": added, "skipped": skipped})
             except Exception as e:
                 self.send_json({"error": f"خطأ في قراءة الملف: {str(e)}"}, 400)
@@ -500,7 +491,7 @@ class Handler(BaseHTTPRequestHandler):
             s["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
             ip = self.headers.get("X-Forwarded-For", self.client_address[0])
             add_log(u, "تعديل محطة", f"عدّل محطة: {s['name']}", ip)
-            save_db(db); sse_broadcast("update"); self.send_json({"ok": True, "station": s})
+            save_db(db); sse_broadcast(); self.send_json({"ok": True, "station": s})
 
         elif p.startswith("/api/users/"):
             if u["role"] != "admin": self.send_json({"error": "غير مصرح"}, 403); return
@@ -517,7 +508,6 @@ class Handler(BaseHTTPRequestHandler):
             for f in ["fullname", "username", "role", "active", "perms"]:
                 if f in body: db["users"][idx][f] = body[f]
             save_db(db)
-            sse_broadcast("update")
             self.send_json({"ok": True, "user": {k: v for k, v in db["users"][idx].items() if k != "password"}})
         else:
             self.send_json({"error": "غير موجود"}, 404)
@@ -532,7 +522,7 @@ class Handler(BaseHTTPRequestHandler):
             sid = int(p.split("/")[-1]); db = load_db()
             db["stations"] = [s for s in db["stations"] if s["id"] != sid]
             for t in ["tax", "guarantee", "social"]: db["files"].pop(f"{sid}_{t}", None)
-            save_db(db); sse_broadcast("update"); self.send_json({"ok": True})
+            save_db(db); sse_broadcast(); self.send_json({"ok": True})
 
         elif p.startswith("/api/users/"):
             if u["role"] != "admin": self.send_json({"error": "غير مصرح"}, 403); return
@@ -544,7 +534,6 @@ class Handler(BaseHTTPRequestHandler):
             save_db(db)
             ip = self.headers.get("X-Forwarded-For", self.client_address[0])
             add_log(u, "حذف مستخدم", f"حذف مستخدم: {deleted_u.get('fullname','')}", ip)
-            sse_broadcast("update")
             self.send_json({"ok": True})
 
         elif p.startswith("/api/files/"):
