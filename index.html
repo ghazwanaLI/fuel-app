@@ -326,6 +326,38 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 #lb-content img{max-width:90vw;max-height:80vh;border-radius:12px;object-fit:contain;}
 #lb-content iframe{width:85vw;height:80vh;border:none;border-radius:12px;background:#fff;}
 
+/* REPORTS */
+.rep-card{background:#fff;border:1.5px solid var(--border);border-radius:16px;margin-bottom:18px;overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow .2s;}
+.rep-card:hover{box-shadow:var(--shadow);}
+.rep-card-hdr{padding:15px 20px;background:linear-gradient(135deg,var(--card2),#f8fdf9);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.rep-station-name{font-size:14px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;}
+.rep-actions{display:flex;gap:8px;align-items:center;}
+.rep-body{overflow-x:auto;}
+.rep-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.rep-tbl th{padding:10px 14px;background:linear-gradient(135deg,#0f3d20,#1a6b38);color:#fff;font-weight:700;font-size:11px;letter-spacing:.3px;text-align:right;}
+.rep-tbl td{padding:10px 14px;border-bottom:1px solid rgba(184,217,197,.4);vertical-align:middle;text-align:right;}
+.rep-tbl tr:last-child td{border-bottom:none;}
+.rep-tbl tr:nth-child(even) td{background:rgba(21,107,56,.02);}
+.rep-doc-lbl{font-weight:800;color:var(--text);}
+.rep-s-exp{color:var(--a2);font-weight:700;}
+.rep-s-soon{color:var(--warn);font-weight:700;}
+.rep-s-ok{color:var(--a3);font-weight:600;}
+.rep-s-none{color:var(--t3);}
+.rep-empty{text-align:center;padding:48px;color:var(--t3);font-size:14px;}
+
+/* طباعة التقارير */
+@media print{
+  body>*:not(#print-area){display:none!important;}
+  #print-area{
+    display:block!important;
+    position:fixed;inset:0;background:#fff;
+    padding:15mm 20mm;z-index:99999;
+    font-family:'Almarai',Arial,sans-serif;
+  }
+  .no-print{display:none!important;}
+}
+#print-area{display:none;}
+
 /* TOAST */
 .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:13px 26px;font-size:13.5px;font-weight:700;z-index:1000;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;box-shadow:0 12px 40px rgba(0,80,40,.16);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
@@ -499,6 +531,7 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
       <div class="nav-item" onclick="goTab('stations',this)"><span class="ni">⛽</span>المحطات</div>
       <div class="nav-item" id="nav-add-station" onclick="goTab('stations',this);setTimeout(openStationModal,200)" style="display:none"><span class="ni">➕</span>إضافة محطة</div>
       <div class="nav-item" onclick="goTab('dashboard',this)"><span class="ni">⚠️</span>انتهاء صلاحية المستندات<span class="nbadge" id="alert-count">0</span></div>
+      <div class="nav-item" onclick="goTab('reports',this)"><span class="ni">📊</span>التقارير</div>
       <div class="nav-sect" id="admin-sect" style="display:none">الإدارة</div>
       <div class="nav-item" id="nav-users" onclick="goTab('users',this)" style="display:none"><span class="ni">👥</span>المستخدمون</div>
       <div class="nav-item" id="nav-logs" onclick="goTab('logs',this)" style="display:none"><span class="ni">📋</span>سجل النشاط</div>
@@ -653,6 +686,31 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
               <tbody id="users-tb"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+      <!-- REPORTS TAB -->
+      <div id="tab-reports" style="display:none">
+        <div class="section">
+          <div class="sec-hdr">
+            <div class="sec-title"><div class="sdot"></div>📊 تقارير المحطات</div>
+            <div class="sec-actions">
+              <div class="search-box"><span class="si">🔍</span><input type="text" id="rep-search" placeholder="بحث باسم المحطة..." oninput="filterReports(this.value)"></div>
+              <select class="fi" id="rep-filter" onchange="filterReports(document.getElementById('rep-search').value)" style="width:160px;padding:8px 12px;font-size:12px">
+                <option value="all">كل المحطات</option>
+                <option value="exp">منتهية الوثائق</option>
+                <option value="soon">تنتهي قريباً</option>
+                <option value="ok">منتظمة</option>
+                <option value="missing">نقص أوليات</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="printAllReports()">🖨️ طباعة الكل</button>
+            </div>
+          </div>
+          <div style="padding:18px 24px" id="rep-list"></div>
         </div>
       </div>
 
@@ -851,6 +909,7 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
   </span>
 </button>
 
+<div id="print-area"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -932,12 +991,13 @@ function initUI(){
 
 // ── TABS ──
 function goTab(name,el){
-  ['dashboard','stations','users','logs'].forEach(t=>document.getElementById('tab-'+t).style.display=t===name?'block':'none');
+  ['dashboard','stations','users','logs','reports'].forEach(t=>document.getElementById('tab-'+t).style.display=t===name?'block':'none');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   if(name==='stations'){sP2=1;renderT2();}
   if(name==='users')loadUsers();
   if(name==='logs')loadLogs();
+  if(name==='reports')renderReports(allStations);
 }
 
 // ── UTILS ──
@@ -1152,6 +1212,196 @@ function showCardDetail(type){
   }
   document.getElementById('ov-card-detail').classList.add('open');
 }
+// ── REPORTS ──
+function filterReports(q){
+  const filter=document.getElementById('rep-filter')?.value||'all';
+  let list=allStations.filter(s=>!q||s.name.includes(q));
+  if(filter==='exp') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0));
+  else if(filter==='soon') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30&&du(s[d.key].expiry)>=0));
+  else if(filter==='ok') list=list.filter(s=>DOCS.every(d=>!s[d.key]||!s[d.key].active||du(s[d.key].expiry)>30));
+  else if(filter==='missing') list=list.filter(s=>!DOCS.some(d=>s[d.key]&&s[d.key].active));
+  renderReports(list);
+}
+
+function renderReports(list){
+  const el=document.getElementById('rep-list');
+  if(!list||!list.length){
+    el.innerHTML=`<div class="rep-empty">✅ لا توجد محطات تطابق الفلتر المحدد</div>`;
+    return;
+  }
+  el.innerHTML=list.map(s=>repCard(s)).join('');
+}
+
+function repStatusHtml(doc){
+  if(!doc||!doc.active) return `<span class="rep-s-none">— غير نشط</span>`;
+  const n=du(doc.expiry);
+  if(n<0) return `<span class="rep-s-exp">⛔ منتهية منذ ${Math.abs(n)} يوم</span>`;
+  if(n<=30) return `<span class="rep-s-soon">⚠️ تنتهي خلال ${n} يوم</span>`;
+  return `<span class="rep-s-ok">✅ سارية — ${n} يوم</span>`;
+}
+
+function repCard(s){
+  const hasAlert=DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30);
+  const pulseDot=hasAlert?`<span class="rap-dot ${DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0)?'rap-exp':'rap-soon'}" style="margin-left:6px;margin-bottom:1px"></span>`:'';
+  const waBtn=s.phone?`<a href="https://wa.me/${(s.phone||'').replace(/\D/g,'')}" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;padding:5px 10px;font-size:13px;border-radius:8px;text-decoration:none">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  </a>`:'';
+  return `
+  <div class="rep-card">
+    <div class="rep-card-hdr">
+      <div class="rep-station-name">${pulseDot}<span>⛽</span> ${s.name}</div>
+      <div class="rep-actions">
+        ${s.phone?`<span style="font-size:11px;color:var(--t3)">📱 ${s.phone}</span>`:''}
+        ${waBtn}
+        <button class="btn btn-outline btn-sm" onclick="printOneReport(${s.id})">🖨️ طباعة</button>
+      </div>
+    </div>
+    <div class="rep-body">
+      <table class="rep-tbl">
+        <thead>
+          <tr>
+            <th style="width:160px">نوع الوثيقة</th>
+            <th style="width:120px">رقم الكتاب</th>
+            <th style="width:120px">تاريخ الكتاب</th>
+            <th style="width:130px">تاريخ الانتهاء</th>
+            <th style="width:80px;text-align:center">الحالة</th>
+            <th>ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${DOCS.map(d=>{
+            const doc=s[d.key];
+            const active=doc&&doc.active;
+            return `<tr>
+              <td><span class="rep-doc-lbl">${d.icon} ${d.label}</span></td>
+              <td style="font-family:monospace;direction:ltr;text-align:right">${active&&doc.bookNo?doc.bookNo:'—'}</td>
+              <td>${active&&doc.bookDate?fd(doc.bookDate):'—'}</td>
+              <td>${active&&doc.expiry?fd(doc.expiry):'—'}</td>
+              <td style="text-align:center">${active?`<span class="badge ${eS(doc.expiry).cls}"><span class="edot ${eS(doc.expiry).dot}" style="margin-left:4px"></span>${eS(doc.expiry).lbl}</span>`:'<span class="badge bn">غير نشط</span>'}</td>
+              <td style="color:var(--t3);font-size:11px">${active?repStatusHtml(doc):''}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${s.updated_by?`<div style="padding:9px 18px;font-size:11px;color:var(--t3);border-top:1px solid var(--border);background:var(--card2)">
+      آخر تعديل: <strong style="color:var(--t2)">${s.updated_by}</strong> — ${(s.updated_at||'').substring(0,16).replace('T',' ')}
+    </div>`:''}
+  </div>`;
+}
+
+function printOneReport(id){
+  const s=allStations.find(x=>x.id===id);
+  if(!s) return;
+  const date=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+  const rows=DOCS.map(d=>{
+    const doc=s[d.key];
+    const active=doc&&doc.active;
+    const n=active?du(doc.expiry):null;
+    const statusTxt=!active?'غير نشط':n<0?`منتهية منذ ${Math.abs(n)} يوم`:n<=30?`تنتهي خلال ${n} يوم`:`سارية — ${n} يوم`;
+    return `<tr>
+      <td>${d.icon} ${d.label}</td>
+      <td>${active&&doc.bookNo?doc.bookNo:'—'}</td>
+      <td>${active&&doc.bookDate?fd(doc.bookDate):'—'}</td>
+      <td>${active&&doc.expiry?fd(doc.expiry):'—'}</td>
+      <td>${statusTxt}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('print-area').innerHTML=`
+    <div style="font-family:Almarai,Arial,sans-serif;direction:rtl;padding:16mm 20mm;background:#fff;color:#000">
+      <div style="border-bottom:3px solid #1a6b38;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13pt;font-weight:700;color:#1a6b38">شركة توزيع المنتجات النفطية</div>
+          <div style="font-size:11pt;color:#555">فرع صلاح الدين — OPDC | شعبة تقنية المعلومات</div>
+        </div>
+        <div style="text-align:left;font-size:10pt;color:#555">
+          <div>التاريخ: ${date}</div>
+          <div>الإصدار: V1.5.0</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:17pt;font-weight:700;color:#0a2e14;border-top:1px solid #1a6b38;border-bottom:1px solid #1a6b38;padding:10px 0;margin-bottom:20px">
+        تقرير وثائق المحطة
+      </div>
+      <div style="font-size:16pt;font-weight:800;color:#0a2e14;margin-bottom:16px">⛽ ${s.name}</div>
+      ${s.phone?`<div style="font-size:10pt;color:#555;margin-bottom:14px">📱 رقم الواتساب: ${s.phone}</div>`:''}
+      <table style="width:100%;border-collapse:collapse;font-size:11pt;margin-bottom:24px">
+        <thead>
+          <tr style="background:#1a6b38;color:#fff">
+            <th style="padding:10px 14px;text-align:right">نوع الوثيقة</th>
+            <th style="padding:10px 14px;text-align:right">رقم الكتاب</th>
+            <th style="padding:10px 14px;text-align:right">تاريخ الكتاب</th>
+            <th style="padding:10px 14px;text-align:right">تاريخ الانتهاء</th>
+            <th style="padding:10px 14px;text-align:right">الحالة</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${s.updated_by?`<div style="font-size:9pt;color:#888;border-top:1px solid #ddd;padding-top:10px">
+        آخر تعديل: ${s.updated_by} — ${(s.updated_at||'').substring(0,16).replace('T',' ')}
+      </div>`:''}
+      <div style="margin-top:40px;display:flex;justify-content:space-between">
+        <div style="text-align:center;min-width:160px">
+          <div style="font-size:9pt;color:#888;margin-bottom:36px">توقيع المختص</div>
+          <div style="border-top:1px solid #333;padding-top:6px;font-size:10pt"></div>
+        </div>
+        <div style="text-align:center;min-width:160px">
+          <div style="font-size:9pt;color:#888;margin-bottom:36px">مدير الشعبة</div>
+          <div style="border-top:1px solid #333;padding-top:6px;font-size:10pt"></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:30px;font-size:9pt;color:#888;border-top:1px solid #ddd;padding-top:10px">
+        شركة توزيع المنتجات النفطية — فرع صلاح الدين | V1.5.0 | ${date}
+      </div>
+    </div>`;
+  window.print();
+  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },1000);
+}
+
+function printAllReports(){
+  const q=document.getElementById('rep-search')?.value||'';
+  const filter=document.getElementById('rep-filter')?.value||'all';
+  let list=allStations.filter(s=>!q||s.name.includes(q));
+  if(filter==='exp') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0));
+  else if(filter==='soon') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30&&du(s[d.key].expiry)>=0));
+  else if(filter==='ok') list=list.filter(s=>DOCS.every(d=>!s[d.key]||!s[d.key].active||du(s[d.key].expiry)>30));
+  else if(filter==='missing') list=list.filter(s=>!DOCS.some(d=>s[d.key]&&s[d.key].active));
+  if(!list.length){toast('لا توجد محطات للطباعة','err');return;}
+  const date=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+  const allRows=list.map(s=>{
+    const docRows=DOCS.map(d=>{
+      const doc=s[d.key]; const active=doc&&doc.active;
+      const n=active?du(doc.expiry):null;
+      const statusTxt=!active?'غير نشط':n<0?`منتهية منذ ${Math.abs(n)} يوم`:n<=30?`تنتهي خلال ${n} يوم`:`سارية — ${n} يوم`;
+      return `<tr><td>${d.icon} ${d.label}</td><td>${active&&doc.bookNo?doc.bookNo:'—'}</td><td>${active&&doc.bookDate?fd(doc.bookDate):'—'}</td><td>${active&&doc.expiry?fd(doc.expiry):'—'}</td><td>${statusTxt}</td></tr>`;
+    }).join('');
+    return `<div style="page-break-after:always;padding:10mm 0">
+      <div style="font-size:15pt;font-weight:800;color:#0a2e14;margin-bottom:12px;border-right:5px solid #1a6b38;padding-right:12px">⛽ ${s.name}</div>
+      ${s.phone?`<div style="font-size:9pt;color:#555;margin-bottom:10px">📱 ${s.phone}</div>`:''}
+      <table style="width:100%;border-collapse:collapse;font-size:10pt">
+        <thead><tr style="background:#1a6b38;color:#fff">
+          <th style="padding:8px 12px;text-align:right">نوع الوثيقة</th>
+          <th style="padding:8px 12px;text-align:right">رقم الكتاب</th>
+          <th style="padding:8px 12px;text-align:right">تاريخ الكتاب</th>
+          <th style="padding:8px 12px;text-align:right">تاريخ الانتهاء</th>
+          <th style="padding:8px 12px;text-align:right">الحالة</th>
+        </tr></thead>
+        <tbody>${docRows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  document.getElementById('print-area').innerHTML=`
+    <div style="font-family:Almarai,Arial,sans-serif;direction:rtl;color:#000">
+      <div style="text-align:center;border-bottom:3px solid #1a6b38;padding-bottom:14px;margin-bottom:20px">
+        <div style="font-size:15pt;font-weight:700;color:#1a6b38">شركة توزيع المنتجات النفطية — فرع صلاح الدين</div>
+        <div style="font-size:13pt;font-weight:700;color:#0a2e14;margin-top:6px">تقرير وثائق المحطات الأهلية</div>
+        <div style="font-size:9pt;color:#888;margin-top:4px">${date} | إجمالي: ${list.length} محطة</div>
+      </div>
+      ${allRows}
+    </div>`;
+  window.print();
+  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },2000);
+}
+
 function toggleAlertStrip(){
   const body=document.getElementById('alert-strip-body');
   const chev=document.getElementById('as-chevron');
@@ -1535,7 +1785,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/sw.js')
       .then(()=>console.log('SW registered'))
-      .catch(e=>console.log('SW error:',e));
+      .catch(()=>{/* SW not available in this environment */});
   });
 }
 
