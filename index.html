@@ -1430,18 +1430,26 @@ function dismissAlerts(){
 }
 
 // ── LOAD STATIONS ──
+let _loadRetries=0;
 async function loadStations(){
   try{
     const d=await api('GET','/api/stations');
     allStations=d.stations;
+    _loadRetries=0;
     renderStats();
     renderT2();
+    if(document.getElementById('tab-reports')?.style.display!=='none') renderReports(allStations);
   }catch(e){
-    console.error('loadStations:',e);
-    if(e.message==='Failed to fetch')
-      toast('⚠️ السيرفر غير متصل','err');
-    else
-      toast('خطأ: '+e.message,'err');
+    console.warn('loadStations:',e.message);
+    // فقط نظهر خطأ بعد عدة محاولات فاشلة متتالية
+    _loadRetries++;
+    if(_loadRetries>=3){
+      if(e.message==='Failed to fetch'||e.message==='لا يوجد اتصال بالسيرفر')
+        toast('⚠️ السيرفر غير متصل','err');
+      else
+        toast('خطأ: '+e.message,'err');
+      _loadRetries=0;
+    }
   }
 }
 
@@ -1776,7 +1784,7 @@ function connectSSE(){
   _sseSource.onmessage = (e) => {
     const [type, ver] = e.data.split(':');
     if(ver) updateVerBadge(parseInt(ver));
-    if(type === 'update' || type === 'connected') loadStations();
+    if(type === 'update') loadStations();  // فقط عند التحديث الفعلي
   };
   _sseSource.onerror = () => {
     _sseSource.close();
