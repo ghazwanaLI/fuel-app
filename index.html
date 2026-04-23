@@ -358,13 +358,20 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 
 /* طباعة التقارير */
 @media print{
-  body>*:not(#print-area){display:none!important;}
+  html,body{margin:0;padding:0;}
+  body>*{display:none!important;}
   #print-area{
     display:block!important;
-    position:fixed;inset:0;background:#fff;
-    padding:15mm 20mm;z-index:99999;
+    position:static!important;
+    inset:auto!important;
+    background:#fff!important;
+    padding:12mm 15mm!important;
+    z-index:auto!important;
     font-family:'Almarai',Arial,sans-serif;
+    color:#000;
   }
+  #print-area *{visibility:visible!important;}
+  @page{size:A4;margin:0;}
   .no-print{display:none!important;}
 }
 #print-area{display:none;}
@@ -797,12 +804,27 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
             <div class="sec-title"><div class="sdot"></div>📊 تقارير المحطات</div>
             <div class="sec-actions">
               <div class="search-box"><span class="si">🔍</span><input type="text" id="rep-search" placeholder="بحث باسم المحطة..." oninput="filterReports(this.value)"></div>
-              <select class="fi" id="rep-filter" onchange="filterReports(document.getElementById('rep-search').value)" style="width:160px;padding:8px 12px;font-size:12px">
-                <option value="all">كل المحطات</option>
-                <option value="exp">منتهية الوثائق</option>
-                <option value="soon">تنتهي قريباً</option>
-                <option value="ok">منتظمة</option>
-                <option value="missing">نقص أوليات</option>
+              <select class="fi" id="rep-filter" onchange="filterReports(document.getElementById('rep-search').value)" style="width:200px;padding:8px 12px;font-size:12px">
+                <optgroup label="── عام ──">
+                  <option value="all">كل المحطات</option>
+                  <option value="ok">منتظمة (كل الوثائق سارية)</option>
+                  <option value="missing">نقص أوليات</option>
+                </optgroup>
+                <optgroup label="── تحاسب ضريبي ──">
+                  <option value="tax-exp">منتهي — تحاسب ضريبي</option>
+                  <option value="tax-soon">قارب الانتهاء — تحاسب ضريبي</option>
+                  <option value="tax-ok">سارٍ — تحاسب ضريبي</option>
+                </optgroup>
+                <optgroup label="── خطاب الضمان ──">
+                  <option value="gua-exp">منتهي — خطاب الضمان</option>
+                  <option value="gua-soon">قارب الانتهاء — خطاب الضمان</option>
+                  <option value="gua-ok">سارٍ — خطاب الضمان</option>
+                </optgroup>
+                <optgroup label="── الضمان الاجتماعي ──">
+                  <option value="soc-exp">منتهي — الضمان الاجتماعي</option>
+                  <option value="soc-soon">قارب الانتهاء — الضمان الاجتماعي</option>
+                  <option value="soc-ok">سارٍ — الضمان الاجتماعي</option>
+                </optgroup>
               </select>
               <button class="btn btn-primary btn-sm" onclick="printAllReports()">🖨️ طباعة الكل</button>
             </div>
@@ -1318,14 +1340,27 @@ function showCardDetail(type){
   document.getElementById('ov-card-detail').classList.add('open');
 }
 // ── REPORTS ──
+const DOC_KEY_MAP = {tax:'tax', gua:'guarantee', soc:'social'};
+
+function applyFilter(list, filter){
+  if(filter==='all')    return list;
+  if(filter==='ok')     return list.filter(s=>DOCS.every(d=>!s[d.key]||!s[d.key].active||du(s[d.key].expiry)>30));
+  if(filter==='missing')return list.filter(s=>!DOCS.some(d=>s[d.key]&&s[d.key].active));
+  // فلاتر حسب نوع الوثيقة: "tax-exp" / "gua-soon" / "soc-ok" إلخ
+  const [prefix, status] = filter.split('-');
+  const key = DOC_KEY_MAP[prefix];
+  if(!key) return list;
+  if(status==='exp')  return list.filter(s=>s[key]&&s[key].active&&du(s[key].expiry)<0);
+  if(status==='soon') return list.filter(s=>s[key]&&s[key].active&&du(s[key].expiry)>=0&&du(s[key].expiry)<=60);
+  if(status==='ok')   return list.filter(s=>s[key]&&s[key].active&&du(s[key].expiry)>60);
+  return list;
+}
+
 function filterReports(q){
   const filter=document.getElementById('rep-filter')?.value||'all';
   let list=[...allStations];
   if(q) list=list.filter(s=>s.name.includes(q));
-  if(filter==='exp')    list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0));
-  else if(filter==='soon')  list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30&&du(s[d.key].expiry)>=0));
-  else if(filter==='ok')    list=list.filter(s=>DOCS.every(d=>!s[d.key]||!s[d.key].active||du(s[d.key].expiry)>30));
-  else if(filter==='missing') list=list.filter(s=>!DOCS.some(d=>s[d.key]&&s[d.key].active));
+  list=applyFilter(list,filter);
   renderReports(list);
 }
 
@@ -1479,11 +1514,10 @@ function printOneReport(id){
 function printAllReports(){
   const q=document.getElementById('rep-search')?.value||'';
   const filter=document.getElementById('rep-filter')?.value||'all';
-  let list=allStations.filter(s=>!q||s.name.includes(q));
-  if(filter==='exp') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0));
-  else if(filter==='soon') list=list.filter(s=>DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30&&du(s[d.key].expiry)>=0));
-  else if(filter==='ok') list=list.filter(s=>DOCS.every(d=>!s[d.key]||!s[d.key].active||du(s[d.key].expiry)>30));
-  else if(filter==='missing') list=list.filter(s=>!DOCS.some(d=>s[d.key]&&s[d.key].active));
+  const filterLabel=document.getElementById('rep-filter')?.selectedOptions[0]?.text||'كل المحطات';
+  let list=[...allStations];
+  if(q) list=list.filter(s=>s.name.includes(q));
+  list=applyFilter(list,filter);
   if(!list.length){toast('لا توجد محطات للطباعة','err');return;}
   const date=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
   const allRows=list.map(s=>{
@@ -1508,17 +1542,18 @@ function printAllReports(){
       </table>
     </div>`;
   }).join('');
-  document.getElementById('print-area').innerHTML=`
-    <div style="font-family:Almarai,Arial,sans-serif;direction:rtl;color:#000">
-      <div style="text-align:center;border-bottom:3px solid #1a6b38;padding-bottom:14px;margin-bottom:20px">
-        <div style="font-size:15pt;font-weight:700;color:#1a6b38">شركة توزيع المنتجات النفطية — فرع صلاح الدين</div>
-        <div style="font-size:13pt;font-weight:700;color:#0a2e14;margin-top:6px">تقرير وثائق المحطات الأهلية</div>
-        <div style="font-size:9pt;color:#888;margin-top:4px">${date} | إجمالي: ${list.length} محطة</div>
-      </div>
-      ${allRows}
-    </div>`;
+  document.getElementById('print-area').innerHTML=
+    '<div style="font-family:Almarai,Arial,sans-serif;direction:rtl;color:#000">'
+    +'<div style="text-align:center;border-bottom:3px solid #1a6b38;padding-bottom:12px;margin-bottom:16px">'
+      +'<div style="font-size:14pt;font-weight:700;color:#1a6b38">شركة توزيع المنتجات النفطية — فرع صلاح الدين</div>'
+      +'<div style="font-size:13pt;font-weight:800;color:#0a2e14;margin-top:5px">تقرير: '+filterLabel+'</div>'
+      +'<div style="font-size:9pt;color:#888;margin-top:4px">'+date+' | إجمالي: '+list.length+' محطة</div>'
+    +'</div>'
+    +allRows
+    +'<div style="text-align:center;margin-top:20px;font-size:8pt;color:#aaa;border-top:1px solid #ddd;padding-top:8px">نظام تدقيق أوليات المحطات الأهلية — V1.5.0</div>'
+    +'</div>';
   window.print();
-  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },2000);
+  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },1500);
 }
 
 function toggleAlertStrip(){
