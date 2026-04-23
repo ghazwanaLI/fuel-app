@@ -166,8 +166,19 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .as-chevron{font-size:13px;color:#b45309;transition:transform .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;}
 .as-chevron.open{transform:rotate(180deg);}
 .alert-strip-body{background:#fff;border-top:1px solid rgba(217,119,6,.15);max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1);}
-.alert-strip-body.open{max-height:600px;}
+.alert-strip-body.open{max-height:340px;overflow-y:auto;}
 .alert-rows{padding:10px 14px 14px;}
+/* شريط تمرير أخضر كبير للتنبيهات */
+.alert-strip-body::-webkit-scrollbar{width:10px;}
+.alert-strip-body::-webkit-scrollbar-track{background:#f0faf3;border-radius:10px;margin:4px;}
+.alert-strip-body::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#22c55e,#15803d);border-radius:10px;border:2px solid #f0faf3;box-shadow:inset 0 1px 2px rgba(255,255,255,.3);}
+.alert-strip-body::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#16a34a,#14532d);}
+/* شريط تمرير سجل النشاط */
+.logs-scroll{max-height:500px;overflow-y:auto;}
+.logs-scroll::-webkit-scrollbar{width:10px;}
+.logs-scroll::-webkit-scrollbar-track{background:#f0faf3;border-radius:10px;margin:4px;}
+.logs-scroll::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#22c55e,#15803d);border-radius:10px;border:2px solid #f0faf3;box-shadow:inset 0 1px 2px rgba(255,255,255,.3);}
+.logs-scroll::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#16a34a,#14532d);}
 .alert-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;margin-bottom:6px;transition:background .15s;}
 .alert-row:last-child{margin-bottom:0;}
 .alert-row:hover{background:rgba(217,119,6,.05);}
@@ -383,13 +394,13 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 .ver-num{font-size:13px;font-weight:900;transition:all .2s;}
 
 /* ROW ALERT PULSE */
-.rap-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block;position:relative;vertical-align:middle;margin-left:6px;}
-.rap-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;animation:rapPulse 1.8s ease infinite;opacity:0;}
-.rap-exp{background:#dc2626;}
-.rap-exp::after{background:rgba(220,38,38,.5);}
-.rap-soon{background:#d97706;}
-.rap-soon::after{background:rgba(217,119,6,.5);}
-@keyframes rapPulse{0%{transform:scale(.7);opacity:.9}65%{transform:scale(2.4);opacity:0}100%{transform:scale(.7);opacity:0}}
+.rap-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;display:inline-block;position:relative;vertical-align:middle;margin-left:6px;}
+.rap-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;animation:rapPulse 1.6s ease infinite;opacity:0;}
+.rap-exp{background:#dc2626;box-shadow:0 0 6px rgba(220,38,38,.6);}
+.rap-exp::after{background:rgba(220,38,38,.45);}
+.rap-soon{background:#d97706;box-shadow:0 0 6px rgba(217,119,6,.6);}
+.rap-soon::after{background:rgba(217,119,6,.45);}
+@keyframes rapPulse{0%{transform:scale(.6);opacity:1}70%{transform:scale(2.6);opacity:0}100%{transform:scale(.6);opacity:0}}
 .tr-alert td{background:rgba(220,38,38,.025)!important;}
 .tr-alert:hover td{background:rgba(220,38,38,.055)!important;}
 .tr-soon td{background:rgba(217,119,6,.02)!important;}
@@ -752,11 +763,13 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
             </div>
             <div class="sec-title"><div class="sdot"></div>📋 سجل النشاط</div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>#</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th><th>IP</th><th>الوقت</th></tr></thead>
-              <tbody id="logs-tbody"></tbody>
-            </table>
+          <div class="logs-scroll">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>#</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th><th>IP</th><th>الوقت</th></tr></thead>
+                <tbody id="logs-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1085,7 +1098,14 @@ function goTab(name,el){
 }
 
 // ── UTILS ──
-function du(d){if(!d)return Infinity;return Math.ceil((new Date(d)-new Date())/86400000);}
+function du(d){
+  if(!d) return Infinity;
+  // نستخدم منتصف الليل بالتوقيت المحلي لتجنب مشاكل timezone
+  const exp = new Date(d + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  return Math.ceil((exp - now) / 86400000);
+}
 function fd(d){if(!d)return '—';const[y,m,day]=d.split('-');return `${day}/${m}/${y}`;}
 function eS(d){const n=du(d);if(n<0)return{cls:'bex',lbl:'منتهية',dot:'e-exp'};if(n<=30)return{cls:'bw',lbl:`${n} يوم`,dot:'e-soon'};return{cls:'bok',lbl:`${n} يوم`,dot:'e-ok'};}
 
@@ -1162,14 +1182,15 @@ function docCell(doc){
 }
 
 function sRow(s,n){
-  const hasExp=DOCS.some(d=>{const doc=s[d.key];return doc&&doc.active&&du(doc.expiry)<0;});
-  const hasSoon=!hasExp&&DOCS.some(d=>{const doc=s[d.key];return doc&&doc.active&&du(doc.expiry)<=30;});
-  const trClass=hasExp?'tr-alert':hasSoon?'tr-soon':'';
-  const pulseDot=hasExp
-    ?`<span class="rap-dot rap-exp" title="وثيقة منتهية" style="margin-left:7px;margin-bottom:1px"></span>`
-    :hasSoon
-    ?`<span class="rap-dot rap-soon" title="تنتهي قريباً" style="margin-left:7px;margin-bottom:1px"></span>`
-    :'';
+  // النقطة الوامضة: تظهر لكل محطة فيها وثيقة منتهية أو تنتهي خلال 60 يوم
+  const hasExp  = DOCS.some(d=>{const doc=s[d.key]; return doc&&doc.active&&du(doc.expiry)<0;});
+  const hasSoon = DOCS.some(d=>{const doc=s[d.key]; return doc&&doc.active&&du(doc.expiry)>=0&&du(doc.expiry)<=60;});
+  const trClass = hasExp?'tr-alert':hasSoon?'tr-soon':'';
+  const pulseDot = hasExp
+    ? `<span class="rap-dot rap-exp" title="وثيقة منتهية" style="margin-left:7px"></span>`
+    : hasSoon
+    ? `<span class="rap-dot rap-soon" title="تنتهي قريباً" style="margin-left:7px"></span>`
+    : '';
   const nameInner=`${pulseDot}${s.name}`;
   const nameCell=can('edit')
     ?`<td style="min-width:170px"><strong style="font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted;display:inline-flex;align-items:center;" onclick="editStation(${s.id})">${nameInner}</strong></td>`
