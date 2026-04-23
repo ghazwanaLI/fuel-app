@@ -1336,7 +1336,13 @@ function showCardDetail(type){
       const n=doc?du(doc.expiry):null;
       const expired=n!==null&&n<0;
       const badge=doc?`<span class="badge ${expired?'bn':'bw'}">${expired?'منتهية':'قريباً — '+n+' يوم'}</span>`:'';
-      const wa=s.phone?`<a href="https://wa.me/${(s.phone||'').replace(/\D/g,'')}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:#25d366;border-radius:8px;color:#fff;text-decoration:none">${waSVG}</a>`:`<span style="color:var(--t3)">—</span>`;
+      const wa=s.phone
+        ?`<a href="https://wa.me/${(s.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent(
+            type==='missing'
+            ? `السلام عليكم،\nنود إشعاركم بضرورة مراجعة شعبة تقنية المعلومات بشركة توزيع المنتجات النفطية — فرع صلاح الدين\n\nبخصوص: *${s.name}*\n\n⚠️ لم يتم تسجيل أي وثائق رسمية لمحطتكم في النظام (التحاسب الضريبي، خطاب الضمان، الضمان الاجتماعي).\n\nيُرجى المبادرة بتقديم الوثائق المطلوبة *بالسرعة القصوى* لتجنب أي إجراءات قانونية.\n\nشكراً لتعاونكم 🙏`
+            : `السلام عليكم،\nنود تنبيهكم بخصوص وثائق *${s.name}*.\n\nيُرجى المراجعة بأسرع وقت ممكن.\nشكراً 🙏`
+          )}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#25d366;color:#fff;text-decoration:none;padding:5px 11px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap">${waSVG} <span>إرسال</span></a>`
+        :`<span style="color:var(--t3);font-size:12px">لا يوجد رقم</span>`;
       const docDate=doc?`<td style="padding:10px 12px;font-size:12px;color:var(--t2)">${fd(doc.expiry)}</td><td style="padding:10px 12px">${badge}</td>`:'';
       return `<tr style="border-bottom:1px solid rgba(184,217,197,.4)">
         <td style="padding:10px 12px;text-align:center"><span class="snum">${i+1}</span></td>
@@ -1346,12 +1352,13 @@ function showCardDetail(type){
       </tr>`;
     }).join('');
     const dateCols=c.docKey?'<th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border)">تاريخ الانتهاء</th><th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border)">الحالة</th>':'';
+    const waHeader=`<th style="padding:10px 12px;text-align:center;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border);min-width:${type==='missing'?'110':'60'}px">${type==='missing'?'إشعار واتساب':'واتساب'}</th>`;
     document.getElementById('cd-list').innerHTML=`<table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:var(--bg2)">
         <th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border);width:44px">#</th>
         <th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border)">اسم المحطة</th>
         ${dateCols}
-        <th style="padding:10px 12px;text-align:center;font-size:11px;color:var(--t2);border-bottom:2px solid var(--border);width:60px">واتساب</th>
+        ${waHeader}
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
