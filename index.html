@@ -1051,32 +1051,13 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 </div>
 
 <!-- PWA INSTALL BUTTON -->
-<button id="pwa-install-btn" onclick="showPWAModal()">
+<button id="pwa-install-btn" onclick="doInstallPWA()" style="display:none">
   <span class="pwa-install-ico">💻</span>
   <span class="pwa-install-txt">
     <span class="pwa-install-main">تثبيت النظام</span>
-    <span class="pwa-install-sub">أضف للشاشة الرئيسية</span>
+    <span class="pwa-install-sub">أضف لسطح المكتب</span>
   </span>
 </button>
-
-<!-- PWA INSTALL MODAL -->
-<div id="pwa-modal" onclick="if(event.target===this)closePWAModal()">
-  <div class="pwa-box">
-    <h3>💻 تثبيت النظام</h3>
-    <p>اختر نظامك لمعرفة طريقة التثبيت</p>
-    <div class="pwa-platforms">
-      <div class="pwa-plat active" onclick="setPWAPlat('chrome',this)">Chrome / Edge</div>
-      <div class="pwa-plat" onclick="setPWAPlat('firefox',this)">Firefox</div>
-      <div class="pwa-plat" onclick="setPWAPlat('ios',this)">iPhone / iPad</div>
-      <div class="pwa-plat" onclick="setPWAPlat('android',this)">Android</div>
-    </div>
-    <div id="pwa-steps"></div>
-    <div style="display:flex;gap:10px;margin-top:4px">
-      <button id="pwa-direct-btn" class="btn btn-primary" style="flex:1;display:none" onclick="doInstallPWA()">⬇️ تثبيت مباشر</button>
-      <button class="btn btn-outline" style="flex:1" onclick="closePWAModal()">إغلاق</button>
-    </div>
-  </div>
-</div>
 
 <div id="print-area"></div>
 <div class="toast" id="toast"></div>
@@ -2068,51 +2049,20 @@ let _deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstall = e;
-  document.getElementById('pwa-direct-btn').style.display='flex';
+  document.getElementById('pwa-install-btn').style.display = 'flex';
 });
 window.addEventListener('appinstalled', () => {
   _deferredInstall = null;
-  document.getElementById('pwa-install-btn').style.display='none';
-  toast('✅ تم تثبيت النظام بنجاح!');
+  document.getElementById('pwa-install-btn').style.display = 'none';
+  toast('✅ تم تثبيت النظام على سطح المكتب!');
 });
-
-const _pwaSteps = {
-  chrome:['افتح النظام في متصفح Chrome أو Edge','في شريط العنوان اضغط أيقونة ⊕ أو القائمة ⋮','اختر "تثبيت التطبيق" أو Install App','اضغط تثبيت — سيظهر على سطح المكتب مباشرة'],
-  firefox:['افتح النظام في متصفح Firefox','اضغط على القائمة ☰ في الزاوية العليا','اختر "تثبيت هذا الموقع كتطبيق"','اضغط تثبيت'],
-  ios:['افتح النظام في Safari','اضغط زر المشاركة □↑ في شريط الأدوات','مرر للأسفل واختر "إضافة إلى الشاشة الرئيسية"','اضغط إضافة — سيظهر الأيقونة على الهوم'],
-  android:['افتح النظام في Chrome على Android','اضغط القائمة ⋮ في الزاوية اليمنى','اختر "إضافة إلى الشاشة الرئيسية"','اضغط إضافة — سيظهر كتطبيق مستقل']
-};
-
-function showPWAModal(){
-  document.getElementById('pwa-modal').classList.add('open');
-  const ua=navigator.userAgent;
-  if(/iPhone|iPad/.test(ua)) setPWAPlat('ios');
-  else if(/Android/.test(ua)) setPWAPlat('android');
-  else if(/Firefox/.test(ua)) setPWAPlat('firefox');
-  else setPWAPlat('chrome');
-}
-function closePWAModal(){
-  document.getElementById('pwa-modal').classList.remove('open');
-}
-function setPWAPlat(plat, el){
-  document.querySelectorAll('.pwa-plat').forEach(b=>b.classList.remove('active'));
-  if(el) el.classList.add('active');
-  else document.querySelectorAll('.pwa-plat').forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+plat+"'")) b.classList.add('active');});
-  const steps=_pwaSteps[plat]||_pwaSteps.chrome;
-  document.getElementById('pwa-steps').innerHTML=steps.map((s,i)=>
-    '<div class="pwa-step"><div class="pwa-step-num">'+(i+1)+'</div><div class="pwa-step-txt">'+s+'</div></div>'
-  ).join('');
-  document.getElementById('pwa-direct-btn').style.display=(plat==='chrome'&&_deferredInstall)?'flex':'none';
-}
 async function doInstallPWA(){
-  if(!_deferredInstall) return;
+  if(!_deferredInstall){ toast('المتصفح لا يدعم التثبيت التلقائي — افتح القائمة وثبّت يدوياً','err'); return; }
   _deferredInstall.prompt();
   const { outcome } = await _deferredInstall.userChoice;
-  if(outcome==='accepted'){
-    _deferredInstall=null;
-    document.getElementById('pwa-install-btn').style.display='none';
-    closePWAModal();
-    toast('✅ تم تثبيت النظام!');
+  if(outcome === 'accepted'){
+    _deferredInstall = null;
+    document.getElementById('pwa-install-btn').style.display = 'none';
   }
 }
 
