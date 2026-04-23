@@ -1116,7 +1116,12 @@ function goTab(name,el){
   if(name==='stations'){sP2=1;renderT2();}
   if(name==='users')loadUsers();
   if(name==='logs')loadLogs();
-  if(name==='reports')renderReports(allStations);
+  if(name==='reports'){
+    const f=document.getElementById('rep-filter')?.value||'all';
+    const [prefix]=f.split('-');
+    const fk=DOC_KEY_MAP[prefix]||null;
+    renderReports(applyFilter([...allStations],f),fk);
+  }
 }
 
 // ── UTILS ──
@@ -1361,10 +1366,13 @@ function filterReports(q){
   let list=[...allStations];
   if(q) list=list.filter(s=>s.name.includes(q));
   list=applyFilter(list,filter);
-  renderReports(list);
+  // حدد الوثيقة المفلترة (إن وجدت)
+  const [prefix] = filter.split('-');
+  const focusKey = DOC_KEY_MAP[prefix] || null; // null = اعرض الكل
+  renderReports(list, focusKey);
 }
 
-function renderReports(list){
+function renderReports(list, focusKey=null){
   const el=document.getElementById('rep-list');
   if(!el) return;
   if(!list||!list.length){
@@ -1373,32 +1381,30 @@ function renderReports(list){
   }
   let html='';
   for(const s of list){
-    try{ html+=repCard(s); }catch(e){ console.error('repCard error',s.name,e); }
+    try{ html+=repCard(s, focusKey); }catch(e){ console.error('repCard error',s.name,e); }
   }
   el.innerHTML=html||'<div class="rep-empty">لا توجد بيانات</div>';
 }
 
-function repCard(s){
+function repCard(s, focusKey=null){
   const hasExp=DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<0);
-  const hasSoon=!hasExp&&DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)<=30);
-  const dot=hasExp?'<span class="rap-dot rap-exp" style="margin-left:6px;vertical-align:middle;display:inline-block"></span>'
-            :hasSoon?'<span class="rap-dot rap-soon" style="margin-left:6px;vertical-align:middle;display:inline-block"></span>':'';
+  const hasSoon=DOCS.some(d=>s[d.key]&&s[d.key].active&&du(s[d.key].expiry)>=0&&du(s[d.key].expiry)<=60);
+  const dot=hasExp?'<span class="rap-dot rap-exp" style="margin-left:7px"></span>'
+            :hasSoon?'<span class="rap-dot rap-soon" style="margin-left:7px"></span>':'';
 
-  // صفوف الوثائق
+  const docsToShow = focusKey ? DOCS.filter(d=>d.key===focusKey) : DOCS;
   let rows='';
-  for(const d of DOCS){
+  for(const d of docsToShow){
     const doc=s[d.key]||{};
     const active=!!doc.active;
     const n=active?du(doc.expiry):null;
     let badgeHtml='<span class="badge bn">غير نشط</span>';
-    if(active){
-      const es=eS(doc.expiry);
-      badgeHtml='<span class="badge '+es.cls+'"><span class="edot '+es.dot+'" style="margin-left:4px"></span>'+es.lbl+'</span>';
-    }
+    if(active){const es=eS(doc.expiry);badgeHtml='<span class="badge '+es.cls+'"><span class="edot '+es.dot+'" style="margin-left:4px"></span>'+es.lbl+'</span>';}
     let statusTxt='';
     if(active){
       if(n<0) statusTxt='<span class="rep-s-exp">منتهية منذ '+Math.abs(n)+' يوم</span>';
       else if(n<=30) statusTxt='<span class="rep-s-soon">تنتهي خلال '+n+' يوم</span>';
+      else if(n<=60) statusTxt='<span class="rep-s-soon">قاربت — '+n+' يوم</span>';
       else statusTxt='<span class="rep-s-ok">سارية — '+n+' يوم</span>';
     }
     rows+='<tr>'
@@ -1410,14 +1416,12 @@ function repCard(s){
       +'<td style="color:var(--t3);font-size:11px">'+statusTxt+'</td>'
       +'</tr>';
   }
-
   const waBtn=s.phone
-    ?'<a href="https://wa.me/'+(s.phone||'').replace(/\D/g,'') +'" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;padding:5px 10px;font-size:13px;border-radius:8px;text-decoration:none">واتساب</a>'
+    ?'<a href="https://wa.me/'+(s.phone||'').replace(/\D/g,'')+'" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;padding:5px 10px;font-size:13px;border-radius:8px;text-decoration:none">واتساب</a>'
     :'';
   const updatedBar=s.updated_by
     ?'<div style="padding:9px 18px;font-size:11px;color:var(--t3);border-top:1px solid var(--border);background:var(--card2)">آخر تعديل: <strong style="color:var(--t2)">'+s.updated_by+'</strong> — '+(s.updated_at||'').substring(0,16).replace('T',' ')+'</div>'
     :'';
-
   return '<div class="rep-card">'
     +'<div class="rep-card-hdr">'
       +'<div class="rep-station-name">'+dot+'⛽ '+s.name+'</div>'
@@ -1443,6 +1447,7 @@ function repCard(s){
     +updatedBar
   +'</div>';
 }
+
 
 function printOneReport(id){
   const s=allStations.find(x=>x.id===id);
@@ -1578,7 +1583,12 @@ async function loadStations(){
     _loadRetries=0;
     renderStats();
     renderT2();
-    if(document.getElementById('tab-reports')?.style.display!=='none') renderReports(allStations);
+    if(document.getElementById('tab-reports')?.style.display!=='none'){
+      const f=document.getElementById('rep-filter')?.value||'all';
+      const [prefix]=f.split('-');
+      const fk=DOC_KEY_MAP[prefix]||null;
+      renderReports(allStations,fk);
+    }
   }catch(e){
     console.warn('loadStations:',e.message);
     // فقط نظهر خطأ بعد عدة محاولات فاشلة متتالية
