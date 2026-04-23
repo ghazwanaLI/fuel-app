@@ -875,9 +875,9 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
         <div class="tog-row"><div class="tog" id="tax-active" onclick="this.classList.toggle('on')"></div><span style="font-size:12px;color:var(--t2)">نشط</span></div>
       </div>
       <div class="doc-fields">
-        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="tax-bookNo" type="text" placeholder="1234/2024"></div>
-        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="tax-bookDate" type="date"></div>
-        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="tax-expiry" type="date"></div>
+        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="tax-bookNo" type="text" placeholder="1234/2024" oninput="autoActivate('tax')"></div>
+        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="tax-bookDate" type="date" onchange="autoActivate('tax')"></div>
+        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="tax-expiry" type="date" onchange="autoActivate('tax')"></div>
       </div>
       <div class="up-box" id="ub-tax">
         <input type="file" accept="image/*,.pdf" onchange="doUpload(event,'tax')">
@@ -895,9 +895,9 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
         <div class="tog-row"><div class="tog" id="guarantee-active" onclick="this.classList.toggle('on')"></div><span style="font-size:12px;color:var(--t2)">نشط</span></div>
       </div>
       <div class="doc-fields">
-        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="guarantee-bookNo" type="text" placeholder="1234/2024"></div>
-        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="guarantee-bookDate" type="date"></div>
-        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="guarantee-expiry" type="date"></div>
+        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="guarantee-bookNo" type="text" placeholder="1234/2024" oninput="autoActivate('guarantee')"></div>
+        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="guarantee-bookDate" type="date" onchange="autoActivate('guarantee')"></div>
+        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="guarantee-expiry" type="date" onchange="autoActivate('guarantee')"></div>
       </div>
       <div class="up-box" id="ub-guarantee">
         <input type="file" accept="image/*,.pdf" onchange="doUpload(event,'guarantee')">
@@ -915,9 +915,9 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
         <div class="tog-row"><div class="tog" id="social-active" onclick="this.classList.toggle('on')"></div><span style="font-size:12px;color:var(--t2)">نشط</span></div>
       </div>
       <div class="doc-fields">
-        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="social-bookNo" type="text" placeholder="1234/2024"></div>
-        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="social-bookDate" type="date"></div>
-        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="social-expiry" type="date"></div>
+        <div class="fg"><label class="fl">رقم الكتاب</label><input class="fi" id="social-bookNo" type="text" placeholder="1234/2024" oninput="autoActivate('social')"></div>
+        <div class="fg"><label class="fl">تاريخ الكتاب</label><input class="fi" id="social-bookDate" type="date" onchange="autoActivate('social')"></div>
+        <div class="fg"><label class="fl">مدة النفاذ</label><input class="fi" id="social-expiry" type="date" onchange="autoActivate('social')"></div>
       </div>
       <div class="up-box" id="ub-social">
         <input type="file" accept="image/*,.pdf" onchange="doUpload(event,'social')">
@@ -1633,6 +1633,14 @@ function renderT2(){const f=getFiltered('sq2');const pages=Math.max(1,Math.ceil(
 function renderPg(id,pages,total,cur,cb){let h=`<span class="pg-info">إجمالي: ${total}</span>`;for(let i=1;i<=pages;i++)h+=`<button class="pg-btn ${cur===i?'active':''}" onclick="(${cb})(${i})">${i}</button>`;document.getElementById(id).innerHTML=h;}
 
 // ── STATION MODAL ──
+function autoActivate(key){
+  const bookNo=document.getElementById(`${key}-bookNo`)?.value.trim();
+  const bookDate=document.getElementById(`${key}-bookDate`)?.value;
+  const expiry=document.getElementById(`${key}-expiry`)?.value;
+  if(bookNo||bookDate||expiry){
+    document.getElementById(`${key}-active`)?.classList.add('on');
+  }
+}
 function resetDocFields(key){
   document.getElementById(`${key}-bookNo`).value='';
   document.getElementById(`${key}-bookDate`).value='';
@@ -1649,12 +1657,16 @@ function fillDocFields(key,doc){
 function getDocFields(key){
   const get=(id)=>{const el=document.getElementById(id);return el?el.value.trim():'';};
   const getCls=(id)=>{const el=document.getElementById(id);return el?el.classList.contains('on'):false;};
-  return{
-    bookNo:get(`${key}-bookNo`),
-    bookDate:get(`${key}-bookDate`),
-    expiry:get(`${key}-expiry`),
-    active:getCls(`${key}-active`),
-  };
+  const bookNo=get(`${key}-bookNo`);
+  const bookDate=get(`${key}-bookDate`);
+  const expiry=get(`${key}-expiry`);
+  // إذا في بيانات مدخلة → يُعتبر نشطاً تلقائياً حتى لو لم يضغط على زر نشط
+  const hasData=!!(bookNo||bookDate||expiry);
+  const active=hasData || getCls(`${key}-active`);
+  // حدّث زر النشط ليعكس الحالة الفعلية
+  const tog=document.getElementById(`${key}-active`);
+  if(tog) active?tog.classList.add('on'):tog.classList.remove('on');
+  return{ bookNo, bookDate, expiry, active };
 }
 
 function openStationModal(){
