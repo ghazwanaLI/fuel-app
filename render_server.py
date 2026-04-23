@@ -5,8 +5,13 @@
 """
 import json, os, hashlib, uuid, base64, io, threading, queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
 import pg8000
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """خادم متعدد الخيوط — يعالج كل طلب في خيط مستقل"""
+    daemon_threads = True
 
 # ── SSE ──
 _sse_clients = []
@@ -508,6 +513,7 @@ class Handler(BaseHTTPRequestHandler):
             for f in ["fullname", "username", "role", "active", "perms"]:
                 if f in body: db["users"][idx][f] = body[f]
             save_db(db)
+            sse_broadcast()
             self.send_json({"ok": True, "user": {k: v for k, v in db["users"][idx].items() if k != "password"}})
         else:
             self.send_json({"error": "غير موجود"}, 404)
@@ -547,7 +553,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print("⏳ جاري تهيئة قاعدة البيانات...")
     init_db()
-    server = HTTPServer(("0.0.0.0", PORT), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"✅ السيرفر يعمل على المنفذ {PORT}")
     try:
         server.serve_forever()
