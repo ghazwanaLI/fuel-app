@@ -358,20 +358,18 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 
 /* طباعة التقارير */
 @media print{
-  html,body{margin:0;padding:0;}
-  body>*{display:none!important;}
+  @page{size:A4;margin:10mm 15mm;}
+  body{visibility:hidden!important;margin:0;padding:0;}
   #print-area{
+    visibility:visible!important;
     display:block!important;
-    position:static!important;
-    inset:auto!important;
+    position:absolute!important;
+    top:0!important;left:0!important;right:0!important;
     background:#fff!important;
-    padding:12mm 15mm!important;
-    z-index:auto!important;
-    font-family:'Almarai',Arial,sans-serif;
-    color:#000;
+    color:#000!important;
+    font-family:'Almarai',Arial,sans-serif!important;
   }
   #print-area *{visibility:visible!important;}
-  @page{size:A4;margin:0;}
   .no-print{display:none!important;}
 }
 #print-area{display:none;}
@@ -516,47 +514,57 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
 /* ═══════════════ SPLASH SCREEN ═══════════════ */
 #splash{
   position:fixed;inset:0;z-index:99999;
-  background:linear-gradient(160deg,#0a2e14 0%,#134a26 60%,#0d3018 100%);
+  background:#fff;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  transition:opacity .6s ease, visibility .6s ease;
+  transition:opacity .7s ease, visibility .7s ease;
 }
 #splash.hide{opacity:0;visibility:hidden;}
 .splash-ring{
-  position:relative;width:160px;height:160px;margin-bottom:32px;
+  position:relative;width:170px;height:170px;margin-bottom:28px;
 }
 .splash-logo{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
 }
-.splash-logo img{width:90px;height:90px;object-fit:contain;border-radius:50%;}
+.splash-logo img{width:100px;height:100px;object-fit:contain;border-radius:50%;}
 .splash-arc{
   position:absolute;inset:0;border-radius:50%;
   border:4px solid transparent;
 }
 .splash-arc-1{
-  border-top-color:#4ade80;border-right-color:#4ade80;
+  border-top-color:#156b38;border-right-color:#156b38;
   animation:arcSpin1 1.4s linear infinite;
 }
 .splash-arc-2{
-  border-bottom-color:rgba(74,222,128,.4);border-left-color:rgba(74,222,128,.4);
+  border-bottom-color:rgba(21,107,56,.3);border-left-color:rgba(21,107,56,.3);
   animation:arcSpin2 1.4s linear infinite;
 }
 @keyframes arcSpin1{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes arcSpin2{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
 .splash-title{
-  font-size:20px;font-weight:800;color:#fff;
-  letter-spacing:.5px;text-align:center;line-height:1.4;margin-bottom:8px;
+  font-size:20px;font-weight:800;color:#0d2b1a;
+  letter-spacing:.5px;text-align:center;line-height:1.4;margin-bottom:6px;
 }
-.splash-sub{font-size:12px;color:rgba(255,255,255,.45);letter-spacing:1px;margin-bottom:28px;}
+.splash-sub{font-size:12px;color:#5a8070;letter-spacing:1px;margin-bottom:24px;}
+.splash-loading{
+  font-size:13px;font-weight:700;color:#156b38;
+  margin-bottom:18px;display:flex;align-items:center;gap:8px;
+  animation:loadingPulse 1.2s ease infinite;
+}
+.splash-loading-dot{width:6px;height:6px;border-radius:50%;background:#156b38;display:inline-block;}
+.splash-loading-dot:nth-child(1){animation:dotBounce 1.2s ease infinite 0s;}
+.splash-loading-dot:nth-child(2){animation:dotBounce 1.2s ease infinite .2s;}
+.splash-loading-dot:nth-child(3){animation:dotBounce 1.2s ease infinite .4s;}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.4);opacity:.4}40%{transform:scale(1);opacity:1}}
 .splash-bar-wrap{
-  width:200px;height:3px;background:rgba(255,255,255,.1);
+  width:220px;height:4px;background:#e2efe8;
   border-radius:10px;overflow:hidden;
 }
 .splash-bar{
-  height:100%;width:0;background:linear-gradient(90deg,#4ade80,#22c55e);
-  border-radius:10px;animation:loadBar 1.8s ease forwards;
+  height:100%;width:0;background:linear-gradient(90deg,#156b38,#22c55e);
+  border-radius:10px;animation:loadBar 7.5s ease forwards;
 }
-@keyframes loadBar{0%{width:0}70%{width:80%}100%{width:100%}}
-.splash-opdc{margin-top:16px;font-size:11px;color:rgba(255,255,255,.35);letter-spacing:2px;}
+@keyframes loadBar{0%{width:0}60%{width:70%}90%{width:92%}100%{width:100%}}
+.splash-opdc{margin-top:14px;font-size:10px;color:#8fc4a8;letter-spacing:2px;}
 
 /* ═══════════════ GREEN THEME - NO BOXES ═══════════════ */
 /* Cards without heavy borders */
@@ -599,6 +607,12 @@ th:nth-child(8),td:nth-child(8){width:90px;text-align:center;}
   </div>
   <div class="splash-title">تدقيق اوليات المحطات الاهلية</div>
   <div class="splash-sub">OPDC — صلاح الدين</div>
+  <div class="splash-loading">
+    جار تحميل بيانات النظام
+    <span class="splash-loading-dot"></span>
+    <span class="splash-loading-dot"></span>
+    <span class="splash-loading-dot"></span>
+  </div>
   <div class="splash-bar-wrap"><div class="splash-bar"></div></div>
   <div class="splash-opdc">V1.5.0</div>
 </div>
@@ -1512,8 +1526,12 @@ function printOneReport(id){
         شركة توزيع المنتجات النفطية — فرع صلاح الدين | V1.5.0 | ${date}
       </div>
     </div>`;
-  window.print();
-  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },1000);
+  const pa=document.getElementById('print-area');
+  pa.style.display='block';
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ pa.innerHTML=''; pa.style.display='none'; },1500);
+  },100);
 }
 
 function printAllReports(){
@@ -1557,8 +1575,12 @@ function printAllReports(){
     +allRows
     +'<div style="text-align:center;margin-top:20px;font-size:8pt;color:#aaa;border-top:1px solid #ddd;padding-top:8px">نظام تدقيق أوليات المحطات الأهلية — V1.5.0</div>'
     +'</div>';
-  window.print();
-  setTimeout(()=>{ document.getElementById('print-area').innerHTML=''; },1500);
+  const pa=document.getElementById('print-area');
+  pa.style.display='block';
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ pa.innerHTML=''; pa.style.display='none'; },1500);
+  },100);
 }
 
 function toggleAlertStrip(){
@@ -1928,8 +1950,8 @@ function showWelcome(){
 window.addEventListener('load', () => {
   setTimeout(() => {
     const sp = document.getElementById('splash');
-    if(sp){ sp.classList.add('hide'); setTimeout(()=>sp.remove(), 700); }
-  }, 2000);
+    if(sp){ sp.classList.add('hide'); setTimeout(()=>sp.remove(), 800); }
+  }, 8000);
 });
 
 tryAutoLogin();
