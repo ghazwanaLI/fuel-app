@@ -89,7 +89,7 @@ def init_db():
             "users": [
                 {
                     "id": 1,
-                    "fullname": "المدير العام",
+                    "fullname": "مدير النظام",
                     "username": "admin",
                     "password": hash_pw("admin123"),
                     "role": "admin",
