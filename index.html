@@ -1172,14 +1172,26 @@ function buildWhatsAppMsg(s){
   return `السلام عليكم،\nنود تنبيهكم بأن الوثائق التالية لـ *${s.name}* تحتاج إلى تجديد:\n\n${lines.join('\n')}\n\nيرجى مراجعة الجهات المختصة في أقرب وقت.\nشكراً لتعاونكم 🙏`;
 }
 
+// ── WHATSAPP HELPERS ──
+function normalizePhone(p){
+  if(!p) return '';
+  p = p.replace(/[^0-9]/g,'');
+  if(p.startsWith('0')) p = '964' + p.slice(1);
+  else if(p.startsWith('7') && p.length===10) p = '964' + p;
+  return p;
+}
+function openWA(phone, msg){
+  const p = normalizePhone(phone);
+  if(!p){ toast('رقم الهاتف غير صحيح','err'); return; }
+  window.open('https://api.whatsapp.com/send?phone='+p+'&text='+encodeURIComponent(msg),'_blank');
+}
+
 function sendWhatsApp(id){
   const s=allStations.find(x=>x.id===id);
   if(!s){toast('لم يتم العثور على المحطة','err');return;}
   if(!s.phone){toast('لا يوجد رقم واتساب لهذه المحطة','err');return;}
-  const msg=buildWhatsAppMsg(s);
-  if(!msg){toast('لا توجد وثائق منتهية أو قاربت الانتهاء','err');return;}
-  const phone=s.phone.replace(/[^0-9]/g,'');
-  window.open('https://api.whatsapp.com/send?phone='+phone+'&text='+encodeURIComponent(msg),'_blank');
+  const msg=buildWhatsAppMsg(s)||('السلام عليكم، يرجى مراجعة وثائق محطتكم '+s.name+' في اقرب وقت. شكرا');
+  openWA(s.phone, msg);
 }
 
 function sendAllWhatsApp(){
@@ -1190,8 +1202,7 @@ function sendAllWhatsApp(){
     if(i>=stations.length){toast(`تم فتح ${stations.length} محادثة واتساب ✅`);return;}
     const s=stations[i++];
     const msg=buildWhatsAppMsg(s);
-    const phone=s.phone.replace(/[^0-9]/g,'');
-    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`,'_blank');
+    if(msg) openWA(s.phone, msg);
     setTimeout(sendNext,800);
   }
   sendNext();
@@ -1341,7 +1352,7 @@ function showCardDetail(type){
       const msgText=type==='missing'?missingMsg:genMsg;
       const phone=(s.phone||'').replace(/\D/g,'');
       const wa=phone
-        ?`<a href="https://api.whatsapp.com/send?phone=${phone}&amp;text=${encodeURIComponent(msgText)}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#25d366;color:#fff;text-decoration:none;padding:5px 11px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap">${waSVG} <span>إرسال</span></a>`
+        ?`<button onclick="openWA('${s.phone}',${JSON.stringify(msgText)})" style="display:inline-flex;align-items:center;gap:5px;background:#25d366;color:#fff;border:none;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;font-family:inherit">${waSVG} <span>إرسال</span></button>`
         :`<span style="color:var(--t3);font-size:12px">لا يوجد رقم</span>`;
       const docDate=doc?`<td style="padding:10px 12px;font-size:12px;color:var(--t2)">${fd(doc.expiry)}</td><td style="padding:10px 12px">${badge}</td>`:'';
       return `<tr style="border-bottom:1px solid rgba(184,217,197,.4)">
@@ -1438,7 +1449,7 @@ function repCard(s, focusKey=null){
       +'</tr>';
   }
   const waBtn=s.phone
-    ?(()=>{ const _p=(s.phone||'').replace(/\D/g,''); const _m=buildWhatsAppMsg(s)||('السلام عليكم، يرجى مراجعة وثائق محطتكم '+s.name+' في اقرب وقت. شكرا'); return '<a href="https://api.whatsapp.com/send?phone='+_p+'&amp;text='+encodeURIComponent(_m)+'" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;padding:5px 10px;font-size:13px;border-radius:8px;text-decoration:none">واتساب</a>'; })()
+    ?'<button onclick="sendWhatsApp('+s.id+')" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;padding:5px 10px;font-size:13px;border-radius:8px;cursor:pointer;font-family:inherit">واتساب</button>'
     :'';
   const updatedBar=s.updated_by
     ?'<div style="padding:9px 18px;font-size:11px;color:var(--t3);border-top:1px solid var(--border);background:var(--card2)">آخر تعديل: <strong style="color:var(--t2)">'+s.updated_by+'</strong> — '+(s.updated_at||'').substring(0,16).replace('T',' ')+'</div>'
